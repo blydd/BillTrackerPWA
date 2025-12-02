@@ -115,8 +115,8 @@ class BillViewModel: ObservableObject {
         ownerId: UUID,
         note: String? = nil
     ) async throws {
-        // 验证金额必须大于0 (Requirement 1.2)
-        guard amount > 0 else {
+        // 验证金额不能为0 (Requirement 1.2)
+        guard amount != 0 else {
             throw AppError.invalidAmount
         }
         
@@ -218,8 +218,10 @@ class BillViewModel: ObservableObject {
         
         switch paymentMethod {
         case .credit(var creditMethod):
-            // 信贷方式：正数增加欠费，负数减少欠费
-            let newBalance = creditMethod.outstandingBalance + amount
+            // 信贷方式：
+            // 正数：还款，减少欠费，增加可用额度
+            // 负数：消费，增加欠费，减少可用额度
+            let newBalance = creditMethod.outstandingBalance - amount
             
             // 检查是否超过信用额度
             if newBalance > creditMethod.creditLimit {
@@ -231,8 +233,10 @@ class BillViewModel: ObservableObject {
             updatedMethod = .credit(creditMethod)
             
         case .savings(var savingsMethod):
-            // 储蓄方式：正数减少余额，负数增加余额
-            savingsMethod.balance -= amount
+            // 储蓄方式：
+            // 正数：存入，增加余额
+            // 负数：取出，减少余额
+            savingsMethod.balance += amount
             updatedMethod = .savings(savingsMethod)
         }
         
@@ -258,11 +262,11 @@ class BillViewModel: ObservableObject {
             // 如果保存失败，回滚余额更新
             switch paymentMethod {
             case .credit(var creditMethod):
-                creditMethod.outstandingBalance = max(0, creditMethod.outstandingBalance - amount)
+                creditMethod.outstandingBalance = max(0, creditMethod.outstandingBalance + amount)
                 try? await repository.updatePaymentMethod(.credit(creditMethod))
                 
             case .savings(var savingsMethod):
-                savingsMethod.balance += amount
+                savingsMethod.balance -= amount
                 try? await repository.updatePaymentMethod(.savings(savingsMethod))
             }
             throw AppError.persistenceError(underlying: error)
@@ -324,45 +328,25 @@ class BillViewModel: ObservableObject {
         switch paymentMethod {
         case .credit(var creditMethod):
             // 信贷方式余额更新逻辑
-            switch creditMethod.transactionType {
-            case .expense:
-                // 支出：增加欠费，减少可用额度
-                let newBalance = creditMethod.outstandingBalance + amount
-                
-                // 检查是否超过信用额度 (Requirement 6.2)
-                if newBalance > creditMethod.creditLimit {
-                    throw AppError.creditLimitExceeded
-                }
-                
-                creditMethod.outstandingBalance = newBalance
-                
-            case .income:
-                // 收入：减少欠费，增加可用额度
-                creditMethod.outstandingBalance = max(0, creditMethod.outstandingBalance - amount)
-                
-            case .excluded:
-                // 不计入类型不更新余额
-                return
+            // 金额为负数表示支出，正数表示收入
+            // 支出（负数）：增加欠费
+            // 收入（正数）：减少欠费
+            let newBalance = creditMethod.outstandingBalance - amount
+            
+            // 检查是否超过信用额度 (Requirement 6.2)
+            if newBalance > creditMethod.creditLimit {
+                throw AppError.creditLimitExceeded
             }
             
+            creditMethod.outstandingBalance = max(0, newBalance)
             updatedMethod = .credit(creditMethod)
             
         case .savings(var savingsMethod):
             // 储蓄方式余额更新逻辑
-            switch savingsMethod.transactionType {
-            case .expense:
-                // 支出：减少余额
-                savingsMethod.balance -= amount
-                
-            case .income:
-                // 收入：增加余额
-                savingsMethod.balance += amount
-                
-            case .excluded:
-                // 不计入类型不更新余额
-                return
-            }
-            
+            // 金额为负数表示支出，正数表示收入
+            // 支出（负数）：减少余额
+            // 收入（正数）：增加余额
+            savingsMethod.balance += amount
             updatedMethod = .savings(savingsMethod)
         }
         

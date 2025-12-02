@@ -213,11 +213,23 @@ struct BillFormView: View {
     
     // 根据选中的交易类型过滤支付方式
     private var filteredPaymentMethods: [PaymentMethodWrapper] {
-        if selectedTransactionType == .excluded {
-            // 不计入类型可以选择支出和收入的支付方式
+        switch selectedTransactionType {
+        case .expense:
+            // 支出：显示所有支出类型的支付方式（信贷和储蓄）
+            return paymentMethods.filter { $0.transactionType == .expense }
+            
+        case .income:
+            // 收入：只显示储蓄方式
+            return paymentMethods.filter { method in
+                if case .savings = method {
+                    return true
+                }
+                return false
+            }
+            
+        case .excluded:
+            // 不计入：可以选择支出和收入的所有支付方式
             return paymentMethods.filter { $0.transactionType == .expense || $0.transactionType == .income }
-        } else {
-            return paymentMethods.filter { $0.transactionType == selectedTransactionType }
         }
     }
     
@@ -267,12 +279,25 @@ struct BillFormView: View {
     }
     
     private func saveBill() async {
-        guard let amountValue = Decimal(string: amount),
+        guard var amountValue = Decimal(string: amount),
               let paymentMethodId = selectedPaymentMethodId,
               let ownerId = selectedOwnerId else {
             errorMessage = "请填写完整信息"
             showingError = true
             return
+        }
+        
+        // 根据交易类型调整金额符号
+        switch selectedTransactionType {
+        case .expense:
+            // 支出：转为负数
+            amountValue = abs(amountValue) * -1
+        case .income:
+            // 收入：转为正数
+            amountValue = abs(amountValue)
+        case .excluded:
+            // 不计入：保持用户输入的符号
+            break
         }
         
         do {

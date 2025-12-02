@@ -51,7 +51,8 @@ struct BillListView: View {
                             DailySummaryHeader(
                                 date: date,
                                 bills: groupedBills[date] ?? [],
-                                paymentMethods: paymentViewModel.paymentMethods
+                                paymentMethods: paymentViewModel.paymentMethods,
+                                categories: categoryViewModel.categories
                             )
                         }
                     }
@@ -180,6 +181,7 @@ struct DailySummaryHeader: View {
     let date: String
     let bills: [Bill]
     let paymentMethods: [PaymentMethodWrapper]
+    let categories: [BillCategory]
     
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
@@ -209,21 +211,45 @@ struct DailySummaryHeader: View {
     
     private var dailyIncome: Decimal {
         bills.reduce(0) { total, bill in
-            guard let paymentMethod = paymentMethods.first(where: { $0.id == bill.paymentMethodId }),
-                  paymentMethod.transactionType == .income else {
+            // 检查账单是否为不计入类型
+            let billCategories = bill.categoryIds.compactMap { id in
+                categories.first(where: { $0.id == id })
+            }
+            
+            // 如果账单的所有类型都是不计入，则排除
+            let isExcluded = !billCategories.isEmpty && billCategories.allSatisfy { $0.transactionType == .excluded }
+            
+            if isExcluded {
                 return total
             }
-            return total + bill.amount
+            
+            // 金额为正数表示收入
+            if bill.amount > 0 {
+                return total + bill.amount
+            }
+            return total
         }
     }
     
     private var dailyExpense: Decimal {
         bills.reduce(0) { total, bill in
-            guard let paymentMethod = paymentMethods.first(where: { $0.id == bill.paymentMethodId }),
-                  paymentMethod.transactionType == .expense else {
+            // 检查账单是否为不计入类型
+            let billCategories = bill.categoryIds.compactMap { id in
+                categories.first(where: { $0.id == id })
+            }
+            
+            // 如果账单的所有类型都是不计入，则排除
+            let isExcluded = !billCategories.isEmpty && billCategories.allSatisfy { $0.transactionType == .excluded }
+            
+            if isExcluded {
                 return total
             }
-            return total + bill.amount
+            
+            // 金额为负数表示支出，取绝对值
+            if bill.amount < 0 {
+                return total + abs(bill.amount)
+            }
+            return total
         }
     }
     
@@ -256,15 +282,13 @@ struct BillRowView: View {
                     .foregroundColor(.secondary)
             }
             
-            // 归属人
+            // 归属人标签
             if let owner = owners.first(where: { $0.id == bill.ownerId }) {
                 HStack(spacing: 4) {
                     Text("归属人:")
                         .font(.caption)
                         .foregroundColor(.secondary)
-                    Text(owner.name)
-                        .font(.caption)
-                        .foregroundColor(.primary)
+                    TagView(text: owner.name, color: .green)
                 }
             }
             
