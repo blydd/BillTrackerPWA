@@ -146,7 +146,8 @@ class BillViewModel: ObservableObject {
             try await updatePaymentMethodBalance(
                 paymentMethod: paymentMethod,
                 amount: amount,
-                isCreating: true
+                isCreating: true,
+                billOwnerId: ownerId
             )
         }
         
@@ -171,7 +172,8 @@ class BillViewModel: ObservableObject {
                 try? await updatePaymentMethodBalance(
                     paymentMethod: paymentMethod,
                     amount: -amount,
-                    isCreating: true
+                    isCreating: true,
+                    billOwnerId: ownerId
                 )
             }
             throw AppError.persistenceError(underlying: error)
@@ -218,6 +220,11 @@ class BillViewModel: ObservableObject {
         
         switch paymentMethod {
         case .credit(var creditMethod):
+            // 验证信贷方式的归属人是否与账单的归属人匹配
+            guard creditMethod.ownerId == ownerId else {
+                throw AppError.ownerMismatch
+            }
+            
             // 信贷方式：
             // 正数：还款，减少欠费，增加可用额度
             // 负数：消费，增加欠费，减少可用额度
@@ -233,6 +240,11 @@ class BillViewModel: ObservableObject {
             updatedMethod = .credit(creditMethod)
             
         case .savings(var savingsMethod):
+            // 验证储蓄方式的归属人是否与账单的归属人匹配
+            guard savingsMethod.ownerId == ownerId else {
+                throw AppError.ownerMismatch
+            }
+            
             // 储蓄方式：
             // 正数：存入，增加余额
             // 负数：取出，减少余额
@@ -290,7 +302,8 @@ class BillViewModel: ObservableObject {
             try await updatePaymentMethodBalance(
                 paymentMethod: paymentMethod,
                 amount: -bill.amount,
-                isCreating: false
+                isCreating: false,
+                billOwnerId: bill.ownerId
             )
         }
         
@@ -303,7 +316,8 @@ class BillViewModel: ObservableObject {
                 try? await updatePaymentMethodBalance(
                     paymentMethod: paymentMethod,
                     amount: bill.amount,
-                    isCreating: false
+                    isCreating: false,
+                    billOwnerId: bill.ownerId
                 )
             }
             throw AppError.persistenceError(underlying: error)
@@ -317,16 +331,23 @@ class BillViewModel: ObservableObject {
     ///   - paymentMethod: 支付方式
     ///   - amount: 金额
     ///   - isCreating: 是否是创建操作
+    ///   - billOwnerId: 账单的归属人ID（用于匹配信贷方式）
     /// - Throws: AppError 如果更新失败
     private func updatePaymentMethodBalance(
         paymentMethod: PaymentMethodWrapper,
         amount: Decimal,
-        isCreating: Bool
+        isCreating: Bool,
+        billOwnerId: UUID
     ) async throws {
         var updatedMethod = paymentMethod
         
         switch paymentMethod {
         case .credit(var creditMethod):
+            // 验证信贷方式的归属人是否与账单的归属人匹配
+            guard creditMethod.ownerId == billOwnerId else {
+                throw AppError.ownerMismatch
+            }
+            
             // 信贷方式余额更新逻辑
             // 金额为负数表示支出，正数表示收入
             // 支出（负数）：增加欠费
@@ -342,6 +363,11 @@ class BillViewModel: ObservableObject {
             updatedMethod = .credit(creditMethod)
             
         case .savings(var savingsMethod):
+            // 验证储蓄方式的归属人是否与账单的归属人匹配
+            guard savingsMethod.ownerId == billOwnerId else {
+                throw AppError.ownerMismatch
+            }
+            
             // 储蓄方式余额更新逻辑
             // 金额为负数表示支出，正数表示收入
             // 支出（负数）：减少余额

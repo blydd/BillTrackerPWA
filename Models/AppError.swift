@@ -11,6 +11,7 @@ enum AppError: Error, LocalizedError {
     case insufficientBalance
     case invalidCreditLimit
     case dataNotFound
+    case ownerMismatch
     case persistenceError(underlying: Error)
     case exportError(underlying: Error)
     
@@ -34,6 +35,8 @@ enum AppError: Error, LocalizedError {
             return "信用额度必须大于等于初始欠费金额"
         case .dataNotFound:
             return "数据不存在"
+        case .ownerMismatch:
+            return "信贷方式的归属人与账单归属人不匹配"
         case .persistenceError(let error):
             return "数据保存失败: \(error.localizedDescription)"
         case .exportError(let error):

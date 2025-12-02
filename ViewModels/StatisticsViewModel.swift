@@ -62,35 +62,40 @@ class StatisticsViewModel: ObservableObject {
                     continue
                 }
                 
-                // 排除"不计入"类型 (Requirement 8.5)
-                guard paymentMethod.transactionType != .excluded else {
+                // 检查账单类型是否为"不计入"
+                let billCategories = bill.categoryIds.compactMap { categoryId in
+                    categories.first(where: { $0.id == categoryId })
+                }
+                
+                // 如果账单的所有类型都是不计入，则排除 (Requirement 8.5)
+                let isExcluded = !billCategories.isEmpty && billCategories.allSatisfy { $0.transactionType == .excluded }
+                
+                guard !isExcluded else {
                     continue
                 }
                 
                 // 计算总收入和总支出
-                switch paymentMethod.transactionType {
-                case .income:
+                // 账单金额：正数表示收入，负数表示支出
+                if bill.amount > 0 {
                     income += bill.amount
-                case .expense:
-                    expense += bill.amount
-                case .excluded:
-                    break
+                } else if bill.amount < 0 {
+                    expense += abs(bill.amount)
                 }
                 
                 // 按账单类型统计 (Requirement 8.2)
                 for categoryId in bill.categoryIds {
                     if let categoryName = categoryDict[categoryId] {
-                        catStats[categoryName, default: 0] += bill.amount
+                        catStats[categoryName, default: 0] += abs(bill.amount)
                     }
                 }
                 
                 // 按归属人统计 (Requirement 8.3)
                 if let ownerName = ownerDict[bill.ownerId] {
-                    ownStats[ownerName, default: 0] += bill.amount
+                    ownStats[ownerName, default: 0] += abs(bill.amount)
                 }
                 
                 // 按支付方式统计 (Requirement 8.4)
-                pmStats[paymentMethod.name, default: 0] += bill.amount
+                pmStats[paymentMethod.name, default: 0] += abs(bill.amount)
             }
             
             // 更新发布的属性

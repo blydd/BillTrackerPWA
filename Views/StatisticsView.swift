@@ -96,7 +96,7 @@ struct StatisticsView: View {
         .task {
             await loadStatistics()
         }
-        .onChange(of: selectedTimeRange) { _ in
+        .onChange(of: selectedTimeRange) { oldValue, newValue in
             Task {
                 await loadStatistics()
             }

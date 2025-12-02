@@ -9,46 +9,88 @@ protocol PaymentMethod: Identifiable {
 }
 
 /// 信贷方式
-struct CreditMethod: PaymentMethod, Codable, Equatable {
+struct CreditMethod: PaymentMethod, Equatable {
     let id: UUID
     var name: String
     var transactionType: TransactionType
-    let accountType: AccountType = .credit
+    var accountType: AccountType { .credit }
     var creditLimit: Decimal           // 信用额度
     var outstandingBalance: Decimal    // 欠费金额
     var billingDate: Int               // 账单日
+    var ownerId: UUID                  // 归属人ID
     
     init(id: UUID = UUID(), 
          name: String, 
          transactionType: TransactionType,
          creditLimit: Decimal,
          outstandingBalance: Decimal,
-         billingDate: Int) {
+         billingDate: Int,
+         ownerId: UUID) {
         self.id = id
         self.name = name
         self.transactionType = transactionType
         self.creditLimit = creditLimit
         self.outstandingBalance = outstandingBalance
         self.billingDate = billingDate
+        self.ownerId = ownerId
+    }
+}
+
+// MARK: - Codable
+extension CreditMethod: Codable {
+    enum CodingKeys: String, CodingKey {
+        case id, name, transactionType, creditLimit, outstandingBalance, billingDate, ownerId
+    }
+    
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(UUID.self, forKey: .id)
+        name = try container.decode(String.self, forKey: .name)
+        transactionType = try container.decode(TransactionType.self, forKey: .transactionType)
+        creditLimit = try container.decode(Decimal.self, forKey: .creditLimit)
+        outstandingBalance = try container.decode(Decimal.self, forKey: .outstandingBalance)
+        billingDate = try container.decode(Int.self, forKey: .billingDate)
+        // 兼容旧数据：如果没有ownerId，使用一个默认值（需要后续手动设置）
+        ownerId = try container.decodeIfPresent(UUID.self, forKey: .ownerId) ?? UUID()
     }
 }
 
 /// 储蓄方式
-struct SavingsMethod: PaymentMethod, Codable, Equatable {
+struct SavingsMethod: PaymentMethod, Equatable {
     let id: UUID
     var name: String
     var transactionType: TransactionType
-    let accountType: AccountType = .savings
+    var accountType: AccountType { .savings }
     var balance: Decimal                // 余额
+    var ownerId: UUID                   // 归属人ID
     
     init(id: UUID = UUID(),
          name: String,
          transactionType: TransactionType,
-         balance: Decimal) {
+         balance: Decimal,
+         ownerId: UUID) {
         self.id = id
         self.name = name
         self.transactionType = transactionType
         self.balance = balance
+        self.ownerId = ownerId
+    }
+}
+
+// MARK: - Codable
+extension SavingsMethod: Codable {
+    enum CodingKeys: String, CodingKey {
+        case id, name, transactionType, balance, ownerId
+    }
+    
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(UUID.self, forKey: .id)
+        name = try container.decode(String.self, forKey: .name)
+        transactionType = try container.decode(TransactionType.self, forKey: .transactionType)
+        balance = try container.decode(Decimal.self, forKey: .balance)
+        // 兼容旧数据：如果没有ownerId，使用一个默认值
+        ownerId = try container.decodeIfPresent(UUID.self, forKey: .ownerId) ?? UUID()
     }
 }
 
@@ -106,6 +148,13 @@ enum PaymentMethodWrapper: Codable, Equatable {
         switch self {
         case .credit(let method): return method.accountType
         case .savings(let method): return method.accountType
+        }
+    }
+    
+    var ownerId: UUID {
+        switch self {
+        case .credit(let method): return method.ownerId
+        case .savings(let method): return method.ownerId
         }
     }
 }

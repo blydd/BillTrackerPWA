@@ -48,6 +48,13 @@ struct BillFormView: View {
                     selectedPaymentMethodId = nil
                     selectedCategoryIds.removeAll()
                 }
+                .onChange(of: selectedOwnerId) { _ in
+                    // 切换归属人时，如果当前选择的支付方式不在过滤后的列表中，清空选择
+                    if let selectedId = selectedPaymentMethodId,
+                       !filteredPaymentMethods.contains(where: { $0.id == selectedId }) {
+                        selectedPaymentMethodId = nil
+                    }
+                }
                 
                 Form {
                     Section("基本信息") {
@@ -64,40 +71,7 @@ struct BillFormView: View {
                         }
                     }
                     
-                    // 支付方式标签选择
-                    Section {
-                        VStack(alignment: .leading, spacing: 8) {
-                            Text("支付方式")
-                                .font(.headline)
-                                .foregroundColor(.primary)
-                            
-                            if let selectedId = selectedPaymentMethodId,
-                               let selected = filteredPaymentMethods.first(where: { $0.id == selectedId }) {
-                                SelectableTagView(
-                                    text: selected.name,
-                                    isSelected: true,
-                                    color: .blue
-                                ) {
-                                    selectedPaymentMethodId = nil
-                                }
-                            } else {
-                                FlowLayout(spacing: 8) {
-                                    ForEach(filteredPaymentMethods, id: \.id) { method in
-                                        SelectableTagView(
-                                            text: method.name,
-                                            isSelected: false,
-                                            color: .blue
-                                        ) {
-                                            selectedPaymentMethodId = method.id
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                        .padding(.vertical, 4)
-                    }
-                    
-                    // 归属人标签选择
+                    // 归属人标签选择（放在最前面）
                     Section {
                         VStack(alignment: .leading, spacing: 8) {
                             Text("归属人")
@@ -128,6 +102,45 @@ struct BillFormView: View {
                             }
                         }
                         .padding(.vertical, 4)
+                    }
+                    
+                    // 支付方式标签选择（只有选择了归属人后才显示）
+                    if selectedOwnerId != nil {
+                        Section {
+                            VStack(alignment: .leading, spacing: 8) {
+                                Text("支付方式")
+                                    .font(.headline)
+                                    .foregroundColor(.primary)
+                                
+                                if filteredPaymentMethods.isEmpty {
+                                    Text("该归属人暂无可用的支付方式")
+                                        .foregroundColor(.secondary)
+                                        .font(.caption)
+                                } else if let selectedId = selectedPaymentMethodId,
+                                          let selected = filteredPaymentMethods.first(where: { $0.id == selectedId }) {
+                                    SelectableTagView(
+                                        text: selected.name,
+                                        isSelected: true,
+                                        color: .blue
+                                    ) {
+                                        selectedPaymentMethodId = nil
+                                    }
+                                } else {
+                                    FlowLayout(spacing: 8) {
+                                        ForEach(filteredPaymentMethods, id: \.id) { method in
+                                            SelectableTagView(
+                                                text: method.name,
+                                                isSelected: false,
+                                                color: .blue
+                                            ) {
+                                                selectedPaymentMethodId = method.id
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                            .padding(.vertical, 4)
+                        }
                     }
                     
                     // 账单类型标签选择（多选）
@@ -211,16 +224,18 @@ struct BillFormView: View {
         }
     }
     
-    // 根据选中的交易类型过滤支付方式
+    // 根据选中的交易类型和归属人过滤支付方式
     private var filteredPaymentMethods: [PaymentMethodWrapper] {
+        var filtered: [PaymentMethodWrapper] = []
+        
         switch selectedTransactionType {
         case .expense:
             // 支出：显示所有支出类型的支付方式（信贷和储蓄）
-            return paymentMethods.filter { $0.transactionType == .expense }
+            filtered = paymentMethods.filter { $0.transactionType == .expense }
             
         case .income:
             // 收入：只显示储蓄方式
-            return paymentMethods.filter { method in
+            filtered = paymentMethods.filter { method in
                 if case .savings = method {
                     return true
                 }
@@ -229,8 +244,17 @@ struct BillFormView: View {
             
         case .excluded:
             // 不计入：可以选择支出和收入的所有支付方式
-            return paymentMethods.filter { $0.transactionType == .expense || $0.transactionType == .income }
+            filtered = paymentMethods.filter { $0.transactionType == .expense || $0.transactionType == .income }
         }
+        
+        // 如果选择了归属人，进一步过滤支付方式（信贷和储蓄都需要匹配归属人）
+        if let ownerId = selectedOwnerId {
+            filtered = filtered.filter { method in
+                method.ownerId == ownerId
+            }
+        }
+        
+        return filtered
     }
     
     // 根据选中的交易类型过滤账单类型

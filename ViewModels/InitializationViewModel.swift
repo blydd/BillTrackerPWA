@@ -114,33 +114,49 @@ class InitializationViewModel: ObservableObject {
     
     /// 初始化支付方式
     private func initializePaymentMethods() async throws {
-        // 信贷方式
-        let creditMethods = [
-            "花呗", "白条", "招商信用卡", "广发信用卡",
-            "兴业信用卡", "农行信用卡", "光大信用卡"
-        ]
+        // 获取归属人列表
+        let owners = try await repository.fetchOwners()
         
-        for name in creditMethods {
-            let method = CreditMethod(
-                name: name,
-                transactionType: .expense,
-                creditLimit: 10000,
-                outstandingBalance: 0,
-                billingDate: 1
-            )
-            try await repository.savePaymentMethod(.credit(method))
+        // 找到"男主"和"女主"
+        guard let maleOwner = owners.first(where: { $0.name == "男主" }),
+              let femaleOwner = owners.first(where: { $0.name == "女主" }) else {
+            throw AppError.missingOwner
         }
         
-        // 储蓄方式
-        let savingsMethods = ["微信零钱", "余额宝"]
+        // 为"男主"和"女主"各创建一套支付方式
+        let targetOwners = [maleOwner, femaleOwner]
         
-        for name in savingsMethods {
-            let method = SavingsMethod(
-                name: name,
-                transactionType: .expense,
-                balance: 0
-            )
-            try await repository.savePaymentMethod(.savings(method))
+        for owner in targetOwners {
+            // 信贷方式
+            let creditMethods = [
+                "花呗", "白条", "招商信用卡", "广发信用卡",
+                "兴业信用卡", "农行信用卡", "光大信用卡"
+            ]
+            
+            for name in creditMethods {
+                let method = CreditMethod(
+                    name: "\(owner.name)-\(name)",
+                    transactionType: .expense,
+                    creditLimit: 10000,
+                    outstandingBalance: 0,
+                    billingDate: 1,
+                    ownerId: owner.id
+                )
+                try await repository.savePaymentMethod(.credit(method))
+            }
+            
+            // 储蓄方式
+            let savingsMethods = ["微信零钱", "余额宝"]
+            
+            for name in savingsMethods {
+                let method = SavingsMethod(
+                    name: "\(owner.name)-\(name)",
+                    transactionType: .expense,
+                    balance: 0,
+                    ownerId: owner.id
+                )
+                try await repository.savePaymentMethod(.savings(method))
+            }
         }
     }
 }

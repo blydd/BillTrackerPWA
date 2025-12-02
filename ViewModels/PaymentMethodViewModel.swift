@@ -40,13 +40,15 @@ class PaymentMethodViewModel: ObservableObject {
     ///   - creditLimit: 信用额度
     ///   - outstandingBalance: 初始欠费金额
     ///   - billingDate: 账单日
+    ///   - ownerId: 归属人ID
     /// - Throws: AppError.invalidCreditLimit 如果信用额度小于初始欠费金额
     func createCreditMethod(
         name: String,
         transactionType: TransactionType,
         creditLimit: Decimal,
         outstandingBalance: Decimal,
-        billingDate: Int
+        billingDate: Int,
+        ownerId: UUID
     ) async throws {
         let trimmedName = name.trimmingCharacters(in: .whitespacesAndNewlines)
         
@@ -64,7 +66,8 @@ class PaymentMethodViewModel: ObservableObject {
             transactionType: transactionType,
             creditLimit: creditLimit,
             outstandingBalance: outstandingBalance,
-            billingDate: billingDate
+            billingDate: billingDate,
+            ownerId: ownerId
         )
         
         let wrapper = PaymentMethodWrapper.credit(creditMethod)
@@ -84,13 +87,15 @@ class PaymentMethodViewModel: ObservableObject {
     ///   - transactionType: 新交易类型（可选）
     ///   - creditLimit: 新信用额度（可选）
     ///   - billingDate: 新账单日（可选）
+    ///   - ownerId: 新归属人ID（可选）
     /// - Throws: AppError.dataNotFound 如果支付方式不存在
     func updateCreditMethod(
         id: UUID,
         name: String? = nil,
         transactionType: TransactionType? = nil,
         creditLimit: Decimal? = nil,
-        billingDate: Int? = nil
+        billingDate: Int? = nil,
+        ownerId: UUID? = nil
     ) async throws {
         guard let index = paymentMethods.firstIndex(where: { $0.id == id }),
               case .credit(var creditMethod) = paymentMethods[index] else {
@@ -122,6 +127,10 @@ class PaymentMethodViewModel: ObservableObject {
             creditMethod.billingDate = billingDate
         }
         
+        if let ownerId = ownerId {
+            creditMethod.ownerId = ownerId
+        }
+        
         let updatedWrapper = PaymentMethodWrapper.credit(creditMethod)
         
         do {
@@ -139,11 +148,13 @@ class PaymentMethodViewModel: ObservableObject {
     ///   - name: 方式名称
     ///   - transactionType: 交易类型
     ///   - balance: 初始余额
+    ///   - ownerId: 归属人ID
     /// - Throws: AppError.insufficientBalance 如果初始余额为负数
     func createSavingsMethod(
         name: String,
         transactionType: TransactionType,
-        balance: Decimal
+        balance: Decimal,
+        ownerId: UUID
     ) async throws {
         let trimmedName = name.trimmingCharacters(in: .whitespacesAndNewlines)
         
@@ -159,7 +170,8 @@ class PaymentMethodViewModel: ObservableObject {
         let savingsMethod = SavingsMethod(
             name: trimmedName,
             transactionType: transactionType,
-            balance: balance
+            balance: balance,
+            ownerId: ownerId
         )
         
         let wrapper = PaymentMethodWrapper.savings(savingsMethod)
@@ -177,11 +189,13 @@ class PaymentMethodViewModel: ObservableObject {
     ///   - id: 支付方式ID
     ///   - name: 新名称（可选）
     ///   - transactionType: 新交易类型（可选）
+    ///   - ownerId: 新归属人ID（可选）
     /// - Throws: AppError.dataNotFound 如果支付方式不存在
     func updateSavingsMethod(
         id: UUID,
         name: String? = nil,
-        transactionType: TransactionType? = nil
+        transactionType: TransactionType? = nil,
+        ownerId: UUID? = nil
     ) async throws {
         guard let index = paymentMethods.firstIndex(where: { $0.id == id }),
               case .savings(var savingsMethod) = paymentMethods[index] else {
@@ -199,6 +213,10 @@ class PaymentMethodViewModel: ObservableObject {
         
         if let transactionType = transactionType {
             savingsMethod.transactionType = transactionType
+        }
+        
+        if let ownerId = ownerId {
+            savingsMethod.ownerId = ownerId
         }
         
         let updatedWrapper = PaymentMethodWrapper.savings(savingsMethod)
