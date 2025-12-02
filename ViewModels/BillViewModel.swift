@@ -106,6 +106,7 @@ class BillViewModel: ObservableObject {
     ///   - categoryIds: 账单类型ID列表
     ///   - ownerId: 归属人ID
     ///   - note: 备注（可选）
+    ///   - createdAt: 账单时间（可选，默认为当前时间）
     /// - Throws: AppError 如果验证失败或保存失败
     /// - Requirements: 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 6.1, 6.2, 6.3, 6.4, 6.5, 6.6
     func createBill(
@@ -113,7 +114,8 @@ class BillViewModel: ObservableObject {
         paymentMethodId: UUID,
         categoryIds: [UUID],
         ownerId: UUID,
-        note: String? = nil
+        note: String? = nil,
+        createdAt: Date = Date()
     ) async throws {
         // 验证金额不能为0 (Requirement 1.2)
         guard amount != 0 else {
@@ -151,16 +153,15 @@ class BillViewModel: ObservableObject {
             )
         }
         
-        // 创建账单，自动记录时间戳 (Requirement 1.6)
-        let now = Date()
+        // 创建账单，使用指定的时间或当前时间 (Requirement 1.6)
         let bill = Bill(
             amount: amount,
             paymentMethodId: paymentMethodId,
             categoryIds: categoryIds,
             ownerId: ownerId,
             note: note,
-            createdAt: now,
-            updatedAt: now
+            createdAt: createdAt,
+            updatedAt: Date()
         )
         
         do {
@@ -187,13 +188,15 @@ class BillViewModel: ObservableObject {
     ///   - categoryIds: 账单类型ID列表
     ///   - ownerId: 归属人ID
     ///   - note: 备注（可选）
+    ///   - createdAt: 账单时间（可选，默认为当前时间）
     /// - Throws: AppError 如果验证失败或保存失败
     func createBillWithExcludedType(
         amount: Decimal,
         paymentMethodId: UUID,
         categoryIds: [UUID],
         ownerId: UUID,
-        note: String? = nil
+        note: String? = nil,
+        createdAt: Date = Date()
     ) async throws {
         // 验证金额不能为0
         guard amount != 0 else {
@@ -255,16 +258,15 @@ class BillViewModel: ObservableObject {
         // 保存更新后的支付方式
         try await repository.updatePaymentMethod(updatedMethod)
         
-        // 创建账单
-        let now = Date()
+        // 创建账单，使用指定的时间或当前时间
         let bill = Bill(
             amount: amount,
             paymentMethodId: paymentMethodId,
             categoryIds: categoryIds,
             ownerId: ownerId,
             note: note,
-            createdAt: now,
-            updatedAt: now
+            createdAt: createdAt,
+            updatedAt: Date()
         )
         
         do {

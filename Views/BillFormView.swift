@@ -16,6 +16,8 @@ struct BillFormView: View {
     @State private var selectedCategoryIds: Set<UUID> = []
     @State private var selectedOwnerId: UUID?
     @State private var note = ""
+    @State private var selectedDate = Date()
+    @State private var showingDatePicker = false
     @State private var showingError = false
     @State private var errorMessage = ""
     @FocusState private var isAmountFocused: Bool
@@ -69,6 +71,19 @@ struct BillFormView: View {
                                     .foregroundColor(.secondary)
                             }
                         }
+                        
+                        HStack {
+                            Text("日期")
+                            Spacer()
+                            Text(formattedDate)
+                                .foregroundColor(.secondary)
+                        }
+                        .contentShape(Rectangle())
+                        .onTapGesture {
+                            showingDatePicker = true
+                        }
+                        
+                        DatePicker("时间", selection: $selectedDate, displayedComponents: [.hourAndMinute])
                     }
                     
                     // 归属人标签选择（放在最前面）
@@ -119,7 +134,7 @@ struct BillFormView: View {
                                 } else if let selectedId = selectedPaymentMethodId,
                                           let selected = filteredPaymentMethods.first(where: { $0.id == selectedId }) {
                                     SelectableTagView(
-                                        text: selected.name,
+                                        text: displayPaymentMethodName(selected.name),
                                         isSelected: true,
                                         color: .blue
                                     ) {
@@ -129,7 +144,7 @@ struct BillFormView: View {
                                     FlowLayout(spacing: 8) {
                                         ForEach(filteredPaymentMethods, id: \.id) { method in
                                             SelectableTagView(
-                                                text: method.name,
+                                                text: displayPaymentMethodName(method.name),
                                                 isSelected: false,
                                                 color: .blue
                                             ) {
@@ -221,7 +236,31 @@ struct BillFormView: View {
                     isAmountFocused = true
                 }
             }
+            .sheet(isPresented: $showingDatePicker) {
+                NavigationView {
+                    DatePicker("选择日期", selection: $selectedDate, displayedComponents: [.date])
+                        .datePickerStyle(.graphical)
+                        .padding()
+                        .navigationTitle("选择日期")
+                        .navigationBarTitleDisplayMode(.inline)
+                        .toolbar {
+                            ToolbarItem(placement: .confirmationAction) {
+                                Button("完成") {
+                                    showingDatePicker = false
+                                }
+                            }
+                        }
+                }
+                .presentationDetents([.medium])
+            }
         }
+    }
+    
+    /// 格式化日期为 yyyy-MM-dd
+    private var formattedDate: String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd"
+        return formatter.string(from: selectedDate)
     }
     
     // 根据选中的交易类型和归属人过滤支付方式
@@ -271,6 +310,16 @@ struct BillFormView: View {
         case .excluded:
             return "不计入"
         }
+    }
+    
+    /// 处理支付方式名称显示，去掉"归属人-"前缀
+    private func displayPaymentMethodName(_ name: String) -> String {
+        // 如果名称包含"-"，则去掉第一个"-"之前的部分
+        if let dashIndex = name.firstIndex(of: "-") {
+            let startIndex = name.index(after: dashIndex)
+            return String(name[startIndex...])
+        }
+        return name
     }
     
     private var isFormValid: Bool {
@@ -332,7 +381,8 @@ struct BillFormView: View {
                     paymentMethodId: paymentMethodId,
                     categoryIds: Array(selectedCategoryIds),
                     ownerId: ownerId,
-                    note: note.isEmpty ? nil : note
+                    note: note.isEmpty ? nil : note,
+                    createdAt: selectedDate
                 )
             } else {
                 try await billViewModel.createBill(
@@ -340,7 +390,8 @@ struct BillFormView: View {
                     paymentMethodId: paymentMethodId,
                     categoryIds: Array(selectedCategoryIds),
                     ownerId: ownerId,
-                    note: note.isEmpty ? nil : note
+                    note: note.isEmpty ? nil : note,
+                    createdAt: selectedDate
                 )
             }
             onBillAdded() // 通知列表页刷新
