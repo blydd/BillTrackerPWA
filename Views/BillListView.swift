@@ -133,23 +133,34 @@ struct BillListView: View {
                 }
             }
         }
-        .navigationTitle("账单列表")
+        .navigationBarTitleDisplayMode(.inline)
         .toolbar {
-            ToolbarItem(placement: .navigationBarLeading) {
-                HStack(spacing: 16) {
+            ToolbarItem(placement: .principal) {
+                HStack(spacing: 20) {
                     Button {
                         showingFilterSheet = true
                     } label: {
-                        Label("筛选", systemImage: hasActiveFilters ? "line.3.horizontal.decrease.circle.fill" : "line.3.horizontal.decrease.circle")
+                        HStack(spacing: 6) {
+                            Image(systemName: hasActiveFilters ? "line.3.horizontal.decrease.circle.fill" : "line.3.horizontal.decrease.circle")
+                                .font(.title3)
+                            Text("筛选")
+                                .font(.headline)
+                        }
+                        .foregroundColor(hasActiveFilters ? .blue : .primary)
                     }
                     
                     Button {
                         exportBills()
                     } label: {
-                        if exportViewModel.isExporting {
-                            ProgressView()
-                        } else {
-                            Label("导出", systemImage: "square.and.arrow.up")
+                        HStack(spacing: 6) {
+                            if exportViewModel.isExporting {
+                                ProgressView()
+                            } else {
+                                Image(systemName: "square.and.arrow.up")
+                                    .font(.title3)
+                                Text("导出")
+                                    .font(.headline)
+                            }
                         }
                     }
                     .disabled(billViewModel.bills.isEmpty || exportViewModel.isExporting)
@@ -159,6 +170,7 @@ struct BillListView: View {
             ToolbarItem(placement: .navigationBarTrailing) {
                 Button(action: { showingAddSheet = true }) {
                     Image(systemName: "plus")
+                        .font(.title3)
                 }
             }
         }
@@ -596,7 +608,7 @@ struct ShareSheet: UIViewControllerRepresentable {
     func updateUIViewController(_ uiViewController: UIActivityViewController, context: Context) {}
 }
 
-/// 筛选标签视图
+/// 筛选标签视图（用于显示已选择的筛选条件）
 struct FilterTagView: View {
     let text: String
     let color: Color
@@ -620,6 +632,38 @@ struct FilterTagView: View {
     }
 }
 
+/// 可选择的筛选标签（用于筛选面板）
+struct SelectableFilterTag: View {
+    let text: String
+    let isSelected: Bool
+    let color: Color
+    let onTap: () -> Void
+    
+    var body: some View {
+        Button(action: onTap) {
+            HStack(spacing: 4) {
+                Text(text)
+                    .font(.subheadline)
+                
+                if isSelected {
+                    Image(systemName: "checkmark.circle.fill")
+                        .font(.caption)
+                }
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
+            .background(isSelected ? color : color.opacity(0.2))
+            .foregroundColor(isSelected ? .white : color)
+            .cornerRadius(16)
+            .overlay(
+                RoundedRectangle(cornerRadius: 16)
+                    .stroke(color, lineWidth: isSelected ? 0 : 1)
+            )
+        }
+        .buttonStyle(.plain)
+    }
+}
+
 /// 筛选面板视图
 struct FilterSheetView: View {
     @Environment(\.dismiss) private var dismiss
@@ -634,125 +678,191 @@ struct FilterSheetView: View {
     @Binding var startDate: Date?
     @Binding var endDate: Date?
     
-    @State private var tempStartDate: Date = Date()
-    @State private var tempEndDate: Date = Date()
+    @State private var tempStartDate: Date = {
+        let calendar = Calendar.current
+        return calendar.startOfDay(for: Date())
+    }()
+    @State private var tempEndDate: Date = {
+        let calendar = Calendar.current
+        let endOfDay = calendar.date(bySettingHour: 23, minute: 59, second: 59, of: Date()) ?? Date()
+        return endOfDay
+    }()
     
     var body: some View {
         NavigationView {
-            Form {
-                // 归属人筛选
-                Section("归属人") {
-                    ForEach(owners) { owner in
-                        Button(action: {
-                            if selectedOwnerIds.contains(owner.id) {
-                                selectedOwnerIds.remove(owner.id)
-                                // 清空支付方式筛选
-                                selectedPaymentMethodIds.removeAll()
-                            } else {
-                                selectedOwnerIds.insert(owner.id)
-                            }
-                        }) {
-                            HStack {
-                                Text(owner.name)
-                                    .foregroundColor(.primary)
-                                Spacer()
-                                if selectedOwnerIds.contains(owner.id) {
-                                    Image(systemName: "checkmark")
-                                        .foregroundColor(.blue)
-                                }
-                            }
-                        }
-                    }
-                }
-                
-                // 账单类型筛选
-                Section("账单类型") {
-                    ForEach(categories) { category in
-                        Button(action: {
-                            if selectedCategoryIds.contains(category.id) {
-                                selectedCategoryIds.remove(category.id)
-                            } else {
-                                selectedCategoryIds.insert(category.id)
-                            }
-                        }) {
-                            HStack {
-                                Text(category.name)
-                                    .foregroundColor(.primary)
-                                Spacer()
-                                if selectedCategoryIds.contains(category.id) {
-                                    Image(systemName: "checkmark")
-                                        .foregroundColor(.blue)
-                                }
-                            }
-                        }
-                    }
-                }
-                
-                // 支付方式筛选（只有选择了归属人后才显示）
-                if !selectedOwnerIds.isEmpty {
-                    Section("支付方式") {
-                        ForEach(filteredPaymentMethods, id: \.id) { method in
-                            Button(action: {
-                                if selectedPaymentMethodIds.contains(method.id) {
-                                    selectedPaymentMethodIds.remove(method.id)
-                                } else {
-                                    selectedPaymentMethodIds.insert(method.id)
-                                }
-                            }) {
-                                HStack {
-                                    Text(displayPaymentMethodName(method.name))
-                                        .foregroundColor(.primary)
-                                    Spacer()
-                                    if selectedPaymentMethodIds.contains(method.id) {
-                                        Image(systemName: "checkmark")
-                                            .foregroundColor(.blue)
+            ScrollView {
+                VStack(alignment: .leading, spacing: 20) {
+                    // 归属人筛选
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text("归属人")
+                            .font(.headline)
+                            .padding(.horizontal)
+                        
+                        FlowLayout(spacing: 8) {
+                            ForEach(owners) { owner in
+                                SelectableFilterTag(
+                                    text: owner.name,
+                                    isSelected: selectedOwnerIds.contains(owner.id),
+                                    color: .green
+                                ) {
+                                    if selectedOwnerIds.contains(owner.id) {
+                                        selectedOwnerIds.remove(owner.id)
+                                        // 清空支付方式筛选
+                                        selectedPaymentMethodIds.removeAll()
+                                    } else {
+                                        selectedOwnerIds.insert(owner.id)
                                     }
                                 }
                             }
                         }
+                        .padding(.horizontal)
                     }
-                }
-                
-                // 日期范围筛选
-                Section("日期范围") {
-                    Toggle("开始日期", isOn: Binding(
-                        get: { startDate != nil },
-                        set: { enabled in
-                            if enabled {
-                                startDate = tempStartDate
-                            } else {
-                                startDate = nil
+                    
+                    Divider()
+                    
+                    // 账单类型筛选
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text("账单类型")
+                            .font(.headline)
+                            .padding(.horizontal)
+                        
+                        FlowLayout(spacing: 8) {
+                            ForEach(categories) { category in
+                                SelectableFilterTag(
+                                    text: category.name,
+                                    isSelected: selectedCategoryIds.contains(category.id),
+                                    color: .orange
+                                ) {
+                                    if selectedCategoryIds.contains(category.id) {
+                                        selectedCategoryIds.remove(category.id)
+                                    } else {
+                                        selectedCategoryIds.insert(category.id)
+                                    }
+                                }
                             }
                         }
-                    ))
-                    
-                    if startDate != nil {
-                        DatePicker("", selection: Binding(
-                            get: { startDate ?? Date() },
-                            set: { startDate = $0 }
-                        ), displayedComponents: [.date])
-                        .labelsHidden()
+                        .padding(.horizontal)
                     }
                     
-                    Toggle("结束日期", isOn: Binding(
-                        get: { endDate != nil },
-                        set: { enabled in
-                            if enabled {
-                                endDate = tempEndDate
-                            } else {
-                                endDate = nil
+                    // 支付方式筛选（只有选择了归属人后才显示）
+                    if !selectedOwnerIds.isEmpty {
+                        Divider()
+                        
+                        VStack(alignment: .leading, spacing: 12) {
+                            Text("支付方式")
+                                .font(.headline)
+                                .padding(.horizontal)
+                            
+                            FlowLayout(spacing: 8) {
+                                ForEach(filteredPaymentMethods, id: \.id) { method in
+                                    SelectableFilterTag(
+                                        text: displayPaymentMethodName(method.name),
+                                        isSelected: selectedPaymentMethodIds.contains(method.id),
+                                        color: .blue
+                                    ) {
+                                        if selectedPaymentMethodIds.contains(method.id) {
+                                            selectedPaymentMethodIds.remove(method.id)
+                                        } else {
+                                            selectedPaymentMethodIds.insert(method.id)
+                                        }
+                                    }
+                                }
                             }
+                            .padding(.horizontal)
                         }
-                    ))
-                    
-                    if endDate != nil {
-                        DatePicker("", selection: Binding(
-                            get: { endDate ?? Date() },
-                            set: { endDate = $0 }
-                        ), displayedComponents: [.date])
-                        .labelsHidden()
                     }
+                    
+                    Divider()
+                    
+                    // 日期范围筛选
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text("日期范围")
+                            .font(.headline)
+                            .padding(.horizontal)
+                        
+                        VStack(spacing: 12) {
+                            // 开始日期
+                            VStack(alignment: .leading, spacing: 8) {
+                                HStack {
+                                    Text("开始日期")
+                                        .font(.subheadline)
+                                        .foregroundColor(.secondary)
+                                    Spacer()
+                                    Toggle("", isOn: Binding(
+                                        get: { startDate != nil },
+                                        set: { enabled in
+                                            if enabled {
+                                                let calendar = Calendar.current
+                                                startDate = calendar.startOfDay(for: tempStartDate)
+                                            } else {
+                                                startDate = nil
+                                            }
+                                        }
+                                    ))
+                                    .labelsHidden()
+                                }
+                                
+                                if startDate != nil {
+                                    DatePicker("", selection: Binding(
+                                        get: { startDate ?? Date() },
+                                        set: { newDate in
+                                            let calendar = Calendar.current
+                                            startDate = calendar.startOfDay(for: newDate)
+                                            tempStartDate = newDate
+                                        }
+                                    ), displayedComponents: [.date])
+                                    .datePickerStyle(.compact)
+                                    .labelsHidden()
+                                }
+                            }
+                            .padding()
+                            .background(Color(.systemGray6))
+                            .cornerRadius(12)
+                            
+                            // 结束日期
+                            VStack(alignment: .leading, spacing: 8) {
+                                HStack {
+                                    Text("结束日期")
+                                        .font(.subheadline)
+                                        .foregroundColor(.secondary)
+                                    Spacer()
+                                    Toggle("", isOn: Binding(
+                                        get: { endDate != nil },
+                                        set: { enabled in
+                                            if enabled {
+                                                let calendar = Calendar.current
+                                                endDate = calendar.date(bySettingHour: 23, minute: 59, second: 59, of: tempEndDate) ?? tempEndDate
+                                            } else {
+                                                endDate = nil
+                                            }
+                                        }
+                                    ))
+                                    .labelsHidden()
+                                }
+                                
+                                if endDate != nil {
+                                    DatePicker("", selection: Binding(
+                                        get: { endDate ?? Date() },
+                                        set: { newDate in
+                                            let calendar = Calendar.current
+                                            endDate = calendar.date(bySettingHour: 23, minute: 59, second: 59, of: newDate) ?? newDate
+                                            tempEndDate = newDate
+                                        }
+                                    ), displayedComponents: [.date])
+                                    .datePickerStyle(.compact)
+                                    .labelsHidden()
+                                }
+                            }
+                            .padding()
+                            .background(Color(.systemGray6))
+                            .cornerRadius(12)
+                        }
+                        .padding(.horizontal)
+                    }
+                    
+                    Spacer(minLength: 20)
                 }
+                .padding(.vertical)
             }
             .navigationTitle("筛选条件")
             .navigationBarTitleDisplayMode(.inline)

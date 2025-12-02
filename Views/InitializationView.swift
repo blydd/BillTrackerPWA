@@ -67,7 +67,7 @@ struct InitializationView: View {
                 }
                 
                 DisclosureGroup("归属人") {
-                    Text("丈夫、妻子、女儿、儿子、奶奶、爷爷")
+                    Text("男主、女主、公主、少主")
                         .font(.caption)
                         .padding(.vertical, 4)
                 }
