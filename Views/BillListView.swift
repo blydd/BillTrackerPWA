@@ -298,7 +298,7 @@ struct BillRowView: View {
                     Text("支付方式:")
                         .font(.caption)
                         .foregroundColor(.secondary)
-                    TagView(text: payment.name, color: .blue)
+                    TagView(text: displayPaymentMethodName(payment.name), color: .blue)
                 }
             }
             
@@ -367,6 +367,16 @@ struct BillRowView: View {
         formatter.minimumFractionDigits = 2
         formatter.maximumFractionDigits = 2
         return formatter
+    }
+    
+    /// 处理支付方式名称显示，去掉"归属人-"前缀
+    private func displayPaymentMethodName(_ name: String) -> String {
+        // 如果名称包含"-"，则去掉第一个"-"之前的部分
+        if let dashIndex = name.firstIndex(of: "-") {
+            let startIndex = name.index(after: dashIndex)
+            return String(name[startIndex...])
+        }
+        return name
     }
 }
 
