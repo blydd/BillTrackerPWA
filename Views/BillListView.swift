@@ -12,6 +12,16 @@ struct BillListView: View {
     @State private var showingError = false
     @State private var showingExportSheet = false
     @State private var exportedFileURL: URL?
+    @State private var showingFilterSheet = false
+    
+    // 筛选条件
+    @State private var selectedOwnerIds: Set<UUID> = []
+    @State private var selectedCategoryIds: Set<UUID> = []
+    @State private var selectedPaymentMethodIds: Set<UUID> = []
+    @State private var startDate: Date?
+    @State private var endDate: Date?
+    @State private var showingStartDatePicker = false
+    @State private var showingEndDatePicker = false
     
     private let repository: DataRepository
     
@@ -25,35 +35,99 @@ struct BillListView: View {
     }
     
     var body: some View {
-        Group {
-            if billViewModel.bills.isEmpty {
-                EmptyStateView(
-                    icon: "doc.text",
-                    title: "暂无账单",
-                    message: "点击右上角的 + 按钮创建第一条账单记录"
-                )
-            } else {
-                List {
-                    ForEach(groupedBills.keys.sorted(by: >), id: \.self) { date in
-                        Section {
-                            ForEach(groupedBills[date] ?? []) { bill in
-                                BillRowView(
-                                    bill: bill,
-                                    categories: categoryViewModel.categories,
-                                    owners: ownerViewModel.owners,
-                                    paymentMethods: paymentViewModel.paymentMethods
+        VStack(spacing: 0) {
+            // 筛选条件显示区域
+            if hasActiveFilters {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 8) {
+                        // 归属人筛选标签
+                        ForEach(Array(selectedOwnerIds), id: \.self) { ownerId in
+                            if let owner = ownerViewModel.owners.first(where: { $0.id == ownerId }) {
+                                FilterTagView(text: owner.name, color: .green) {
+                                    selectedOwnerIds.remove(ownerId)
+                                    // 清空支付方式筛选
+                                    selectedPaymentMethodIds.removeAll()
+                                }
+                            }
+                        }
+                        
+                        // 账单类型筛选标签
+                        ForEach(Array(selectedCategoryIds), id: \.self) { categoryId in
+                            if let category = categoryViewModel.categories.first(where: { $0.id == categoryId }) {
+                                FilterTagView(text: category.name, color: .orange) {
+                                    selectedCategoryIds.remove(categoryId)
+                                }
+                            }
+                        }
+                        
+                        // 支付方式筛选标签
+                        ForEach(Array(selectedPaymentMethodIds), id: \.self) { methodId in
+                            if let method = paymentViewModel.paymentMethods.first(where: { $0.id == methodId }) {
+                                FilterTagView(text: displayPaymentMethodName(method.name), color: .blue) {
+                                    selectedPaymentMethodIds.remove(methodId)
+                                }
+                            }
+                        }
+                        
+                        // 日期范围标签
+                        if startDate != nil || endDate != nil {
+                            FilterTagView(text: dateRangeText, color: .purple) {
+                                startDate = nil
+                                endDate = nil
+                            }
+                        }
+                        
+                        // 清空所有筛选
+                        Button(action: clearAllFilters) {
+                            HStack(spacing: 4) {
+                                Image(systemName: "xmark.circle.fill")
+                                Text("清空")
+                            }
+                            .font(.caption)
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 6)
+                            .background(Color.red.opacity(0.2))
+                            .foregroundColor(.red)
+                            .cornerRadius(16)
+                        }
+                    }
+                    .padding(.horizontal)
+                }
+                .padding(.vertical, 8)
+                .background(Color(.systemGroupedBackground))
+            }
+            
+            // 账单列表
+            Group {
+                if filteredBills.isEmpty {
+                    EmptyStateView(
+                        icon: "doc.text",
+                        title: billViewModel.bills.isEmpty ? "暂无账单" : "无符合条件的账单",
+                        message: billViewModel.bills.isEmpty ? "点击右上角的 + 按钮创建第一条账单记录" : "尝试调整筛选条件"
+                    )
+                } else {
+                    List {
+                        ForEach(groupedFilteredBills.keys.sorted(by: >), id: \.self) { date in
+                            Section {
+                                ForEach(groupedFilteredBills[date] ?? []) { bill in
+                                    BillRowView(
+                                        bill: bill,
+                                        categories: categoryViewModel.categories,
+                                        owners: ownerViewModel.owners,
+                                        paymentMethods: paymentViewModel.paymentMethods
+                                    )
+                                }
+                                .onDelete { offsets in
+                                    deleteBillsInSection(date: date, at: offsets)
+                                }
+                            } header: {
+                                DailySummaryHeader(
+                                    date: date,
+                                    bills: groupedFilteredBills[date] ?? [],
+                                    paymentMethods: paymentViewModel.paymentMethods,
+                                    categories: categoryViewModel.categories
                                 )
                             }
-                            .onDelete { offsets in
-                                deleteBillsInSection(date: date, at: offsets)
-                            }
-                        } header: {
-                            DailySummaryHeader(
-                                date: date,
-                                bills: groupedBills[date] ?? [],
-                                paymentMethods: paymentViewModel.paymentMethods,
-                                categories: categoryViewModel.categories
-                            )
                         }
                     }
                 }
@@ -62,16 +136,24 @@ struct BillListView: View {
         .navigationTitle("账单列表")
         .toolbar {
             ToolbarItem(placement: .navigationBarLeading) {
-                Button {
-                    exportBills()
-                } label: {
-                    if exportViewModel.isExporting {
-                        ProgressView()
-                    } else {
-                        Label("导出", systemImage: "square.and.arrow.up")
+                HStack(spacing: 16) {
+                    Button {
+                        showingFilterSheet = true
+                    } label: {
+                        Label("筛选", systemImage: hasActiveFilters ? "line.3.horizontal.decrease.circle.fill" : "line.3.horizontal.decrease.circle")
                     }
+                    
+                    Button {
+                        exportBills()
+                    } label: {
+                        if exportViewModel.isExporting {
+                            ProgressView()
+                        } else {
+                            Label("导出", systemImage: "square.and.arrow.up")
+                        }
+                    }
+                    .disabled(billViewModel.bills.isEmpty || exportViewModel.isExporting)
                 }
-                .disabled(billViewModel.bills.isEmpty || exportViewModel.isExporting)
             }
             
             ToolbarItem(placement: .navigationBarTrailing) {
@@ -107,9 +189,116 @@ struct BillListView: View {
                 Text(error)
             }
         }
+        .sheet(isPresented: $showingFilterSheet) {
+            FilterSheetView(
+                owners: ownerViewModel.owners,
+                categories: categoryViewModel.categories,
+                paymentMethods: paymentViewModel.paymentMethods,
+                selectedOwnerIds: $selectedOwnerIds,
+                selectedCategoryIds: $selectedCategoryIds,
+                selectedPaymentMethodIds: $selectedPaymentMethodIds,
+                startDate: $startDate,
+                endDate: $endDate
+            )
+        }
         .task {
             await loadData()
         }
+    }
+    
+    // 筛选后的账单
+    private var filteredBills: [Bill] {
+        var bills = billViewModel.bills
+        
+        // 按归属人筛选
+        if !selectedOwnerIds.isEmpty {
+            bills = bills.filter { selectedOwnerIds.contains($0.ownerId) }
+        }
+        
+        // 按账单类型筛选
+        if !selectedCategoryIds.isEmpty {
+            bills = bills.filter { bill in
+                !Set(bill.categoryIds).isDisjoint(with: selectedCategoryIds)
+            }
+        }
+        
+        // 按支付方式筛选
+        if !selectedPaymentMethodIds.isEmpty {
+            bills = bills.filter { selectedPaymentMethodIds.contains($0.paymentMethodId) }
+        }
+        
+        // 按日期范围筛选
+        if let start = startDate {
+            bills = bills.filter { $0.createdAt >= start }
+        }
+        if let end = endDate {
+            // 结束日期包含当天的23:59:59
+            let endOfDay = Calendar.current.date(bySettingHour: 23, minute: 59, second: 59, of: end) ?? end
+            bills = bills.filter { $0.createdAt <= endOfDay }
+        }
+        
+        return bills
+    }
+    
+    // 按日期分组筛选后的账单
+    private var groupedFilteredBills: [String: [Bill]] {
+        let dateFormatter = DateFormatter()
+        dateFormatter.dateFormat = "yyyy-MM-dd"
+        
+        var grouped: [String: [Bill]] = [:]
+        
+        for bill in filteredBills {
+            let dateString = dateFormatter.string(from: bill.createdAt)
+            if grouped[dateString] == nil {
+                grouped[dateString] = []
+            }
+            grouped[dateString]?.append(bill)
+        }
+        
+        // 每天内的账单按时间倒序排列
+        for (date, bills) in grouped {
+            grouped[date] = bills.sorted(by: { $0.createdAt > $1.createdAt })
+        }
+        
+        return grouped
+    }
+    
+    // 是否有激活的筛选条件
+    private var hasActiveFilters: Bool {
+        !selectedOwnerIds.isEmpty || !selectedCategoryIds.isEmpty || !selectedPaymentMethodIds.isEmpty || startDate != nil || endDate != nil
+    }
+    
+    // 日期范围文本
+    private var dateRangeText: String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd"
+        
+        if let start = startDate, let end = endDate {
+            return "\(formatter.string(from: start)) ~ \(formatter.string(from: end))"
+        } else if let start = startDate {
+            return "从 \(formatter.string(from: start))"
+        } else if let end = endDate {
+            return "至 \(formatter.string(from: end))"
+        }
+        return ""
+    }
+    
+    // 清空所有筛选条件
+    private func clearAllFilters() {
+        selectedOwnerIds.removeAll()
+        selectedCategoryIds.removeAll()
+        selectedPaymentMethodIds.removeAll()
+        startDate = nil
+        endDate = nil
+    }
+    
+    /// 处理支付方式名称显示，去掉"归属人-"前缀
+    private func displayPaymentMethodName(_ name: String) -> String {
+        if let dashIndex = name.firstIndex(of: "-") {
+            let startIndex = name.index(after: dashIndex)
+            return String(name[startIndex...])
+        }
+        return name
     }
     
     // 按日期分组账单
