@@ -4,6 +4,7 @@ import SwiftUI
 struct StatisticsView: View {
     @StateObject private var viewModel: StatisticsViewModel
     @State private var selectedTimeRange: TimeRange = .thisMonth
+    @State private var showingChartView = false
     
     enum TimeRange: String, CaseIterable {
         case thisMonth = "本月"
@@ -93,6 +94,17 @@ struct StatisticsView: View {
             }
         }
         .navigationTitle("统计分析")
+        .toolbar {
+            ToolbarItem(placement: .navigationBarTrailing) {
+                Button(action: { showingChartView = true }) {
+                    Image(systemName: "chart.pie.fill")
+                        .font(.title3)
+                }
+            }
+        }
+        .sheet(isPresented: $showingChartView) {
+            ChartStatisticsView(viewModel: viewModel)
+        }
         .task {
             await loadStatistics()
         }

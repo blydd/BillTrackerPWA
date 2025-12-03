@@ -37,6 +37,8 @@
 		8DC61B6A2ED985360043BB28 /* ERROR_HANDLING_GUIDE.md in Resources */ = {isa = PBXBuildFile; fileRef = 8DC61B452ED985360043BB28 /* ERROR_HANDLING_GUIDE.md */; };
 		8DC61B702EDDE66C0043BB28 /* InitializationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8DC61B6F2EDDE66C0043BB28 /* InitializationView.swift */; };
 		8DC61B722EDDE67C0043BB28 /* InitializationViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8DC61B712EDDE67C0043BB28 /* InitializationViewModel.swift */; };
+		8DC61B742EE004CB0043BB28 /* ChartStatisticsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8DC61B732EE004CB0043BB28 /* ChartStatisticsView.swift */; };
+		8DC61B762EE004D90043BB28 /* PieChartView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8DC61B752EE004D90043BB28 /* PieChartView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -71,6 +73,8 @@
 		8DC61B4C2ED985360043BB28 /* ToastView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ToastView.swift; sourceTree = "<group>"; };
 		8DC61B6F2EDDE66C0043BB28 /* InitializationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InitializationView.swift; sourceTree = "<group>"; };
 		8DC61B712EDDE67C0043BB28 /* InitializationViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InitializationViewModel.swift; sourceTree = "<group>"; };
+		8DC61B732EE004CB0043BB28 /* ChartStatisticsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChartStatisticsView.swift; sourceTree = "<group>"; };
+		8DC61B752EE004D90043BB28 /* PieChartView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PieChartView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -152,6 +156,8 @@
 		8DC61B4D2ED985360043BB28 /* Views */ = {
 			isa = PBXGroup;
 			children = (
+				8DC61B752EE004D90043BB28 /* PieChartView.swift */,
+				8DC61B732EE004CB0043BB28 /* ChartStatisticsView.swift */,
 				8DC61B6F2EDDE66C0043BB28 /* InitializationView.swift */,
 				8DC61B402ED985360043BB28 /* BillFormView.swift */,
 				8DC61B412ED985360043BB28 /* BillListView.swift */,
@@ -254,6 +260,7 @@
 				8DC61B552ED985360043BB28 /* ErrorAlertModifier.swift in Sources */,
 				8DC61B562ED985360043BB28 /* EmptyStateView.swift in Sources */,
 				8DC61B572ED985360043BB28 /* PaymentMethodViewModel.swift in Sources */,
+				8DC61B742EE004CB0043BB28 /* ChartStatisticsView.swift in Sources */,
 				8DC61B582ED985360043BB28 /* Owner.swift in Sources */,
 				8DC61B592ED985360043BB28 /* CategoryManagementView.swift in Sources */,
 				8DC61B5A2ED985360043BB28 /* PaymentMethodListView.swift in Sources */,
@@ -267,6 +274,7 @@
 				8DC61B612ED985360043BB28 /* AccountType.swift in Sources */,
 				8DC61B622ED985360043BB28 /* TransactionType.swift in Sources */,
 				8DC61B702EDDE66C0043BB28 /* InitializationView.swift in Sources */,
+				8DC61B762EE004D90043BB28 /* PieChartView.swift in Sources */,
 				8DC61B632ED985360043BB28 /* PaymentMethod.swift in Sources */,
 				8DC61B642ED985360043BB28 /* BillViewModel.swift in Sources */,
 				8DC61B652ED985360043BB28 /* BillListView.swift in Sources */,
