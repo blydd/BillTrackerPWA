@@ -27,6 +27,12 @@ struct BillListView: View {
     @State private var showingStartDatePicker = false
     @State private var showingEndDatePicker = false
     
+    // 分页和缓存
+    @State private var displayedBillsCount = 50 // 初始显示50条
+    @State private var isLoadingMore = false
+    @State private var cachedFilteredBills: [Bill] = []
+    @State private var cacheKey: String = ""
+    
     private let repository: DataRepository
     
     init(repository: DataRepository) {
@@ -135,32 +141,77 @@ struct BillListView: View {
                         )
                     } else {
                         ScrollViewReader { proxy in
-                            List {
-                                ForEach(groupedFilteredBills.keys.sorted(by: >), id: \.self) { date in
-                                    Section {
-                                        ForEach(groupedFilteredBills[date] ?? []) { bill in
-                                            BillRowView(
-                                                bill: bill,
-                                                categories: categoryViewModel.categories,
-                                                owners: ownerViewModel.owners,
-                                                paymentMethods: paymentViewModel.paymentMethods,
-                                                onEdit: { bill in
-                                                    editingBill = bill
-                                                    showingEditSheet = true
+                            ScrollView {
+                                LazyVStack(spacing: 0, pinnedViews: [.sectionHeaders]) {
+                                    ForEach(groupedFilteredBills.keys.sorted(by: >), id: \.self) { date in
+                                        Section {
+                                            ForEach(groupedFilteredBills[date] ?? []) { bill in
+                                                VStack(spacing: 0) {
+                                                    BillRowView(
+                                                        bill: bill,
+                                                        categories: categoryViewModel.categories,
+                                                        owners: ownerViewModel.owners,
+                                                        paymentMethods: paymentViewModel.paymentMethods,
+                                                        onEdit: { bill in
+                                                            editingBill = bill
+                                                            showingEditSheet = true
+                                                        }
+                                                    )
+                                                    .padding(.horizontal)
+                                                    .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+                                                        Button(role: .destructive) {
+                                                            Task {
+                                                                do {
+                                                                    try await billViewModel.deleteBill(bill)
+                                                                } catch {
+                                                                    showingError = true
+                                                                }
+                                                            }
+                                                        } label: {
+                                                            Label("删除", systemImage: "trash")
+                                                        }
+                                                    }
+                                                    
+                                                    Divider()
+                                                        .padding(.leading)
                                                 }
-                                            )
+                                                .background(Color(.systemBackground))
+                                            }
+                                        } header: {
+                                            HStack {
+                                                DailySummaryHeader(
+                                                    date: date,
+                                                    bills: getBillsForDate(date), // 使用完整的当天数据
+                                                    paymentMethods: paymentViewModel.paymentMethods,
+                                                    categories: categoryViewModel.categories
+                                                )
+                                                Spacer()
+                                            }
+                                            .padding(.horizontal)
+                                            .padding(.vertical, 8)
+                                            .background(Color(.systemGroupedBackground))
+                                            .id(date == groupedFilteredBills.keys.sorted(by: >).first ? "top" : nil)
                                         }
-                                        .onDelete { offsets in
-                                            deleteBillsInSection(date: date, at: offsets)
+                                    }
+                                    
+                                    // 加载更多指示器
+                                    if paginatedBills.count < filteredBills.count {
+                                        HStack {
+                                            Spacer()
+                                            if isLoadingMore {
+                                                ProgressView()
+                                                    .padding()
+                                            } else {
+                                                Button("加载更多") {
+                                                    loadMoreBills()
+                                                }
+                                                .padding()
+                                            }
+                                            Spacer()
                                         }
-                                    } header: {
-                                        DailySummaryHeader(
-                                            date: date,
-                                            bills: groupedFilteredBills[date] ?? [],
-                                            paymentMethods: paymentViewModel.paymentMethods,
-                                            categories: categoryViewModel.categories
-                                        )
-                                        .id(date == groupedFilteredBills.keys.sorted(by: >).first ? "top" : nil)
+                                        .onAppear {
+                                            loadMoreBills()
+                                        }
                                     }
                                 }
                             }
@@ -290,8 +341,15 @@ struct BillListView: View {
         }
     }
     
-    // 筛选后的账单
+    // 筛选后的账单（带缓存）
     private var filteredBills: [Bill] {
+        let currentCacheKey = generateCacheKey()
+        
+        // 如果缓存键相同，返回缓存结果
+        if currentCacheKey == cacheKey && !cachedFilteredBills.isEmpty {
+            return cachedFilteredBills
+        }
+        
         var bills = billViewModel.bills
         
         // 按归属人筛选
@@ -321,17 +379,71 @@ struct BillListView: View {
             bills = bills.filter { $0.createdAt <= endOfDay }
         }
         
+        // 更新缓存
+        DispatchQueue.main.async {
+            cachedFilteredBills = bills
+            cacheKey = currentCacheKey
+        }
+        
         return bills
     }
     
-    // 按日期分组筛选后的账单
+    // 生成缓存键
+    private func generateCacheKey() -> String {
+        let ownerKey = selectedOwnerIds.sorted().map { $0.uuidString }.joined(separator: ",")
+        let categoryKey = selectedCategoryIds.sorted().map { $0.uuidString }.joined(separator: ",")
+        let paymentKey = selectedPaymentMethodIds.sorted().map { $0.uuidString }.joined(separator: ",")
+        let dateKey = "\(startDate?.timeIntervalSince1970 ?? 0)-\(endDate?.timeIntervalSince1970 ?? 0)"
+        let billsKey = "\(billViewModel.bills.count)"
+        return "\(ownerKey)|\(categoryKey)|\(paymentKey)|\(dateKey)|\(billsKey)"
+    }
+    
+    // 分页显示的账单（确保同一天的账单完整显示）
+    private var paginatedBills: [Bill] {
+        let bills = filteredBills
+        
+        // 如果账单数量小于等于显示数量，直接返回全部
+        if bills.count <= displayedBillsCount {
+            return bills
+        }
+        
+        // 获取前 displayedBillsCount 条
+        let initialBills = Array(bills.prefix(displayedBillsCount))
+        
+        // 如果没有账单，直接返回
+        guard let lastBill = initialBills.last else {
+            return initialBills
+        }
+        
+        // 获取最后一条账单的日期
+        let calendar = Calendar.current
+        let lastBillDate = calendar.startOfDay(for: lastBill.createdAt)
+        
+        // 找出所有与最后一条账单同一天的账单
+        var result = initialBills
+        let remainingBills = bills.dropFirst(displayedBillsCount)
+        
+        for bill in remainingBills {
+            let billDate = calendar.startOfDay(for: bill.createdAt)
+            if billDate == lastBillDate {
+                result.append(bill)
+            } else {
+                // 遇到不同日期的账单，停止添加
+                break
+            }
+        }
+        
+        return result
+    }
+    
+    // 按日期分组筛选后的账单（使用分页数据）
     private var groupedFilteredBills: [String: [Bill]] {
         let dateFormatter = DateFormatter()
         dateFormatter.dateFormat = "yyyy-MM-dd"
         
         var grouped: [String: [Bill]] = [:]
         
-        for bill in filteredBills {
+        for bill in paginatedBills {
             let dateString = dateFormatter.string(from: bill.createdAt)
             if grouped[dateString] == nil {
                 grouped[dateString] = []
@@ -345,6 +457,16 @@ struct BillListView: View {
         }
         
         return grouped
+    }
+    
+    // 获取某一天的完整账单列表（用于汇总计算）
+    private func getBillsForDate(_ dateString: String) -> [Bill] {
+        // 使用完整的筛选结果而不是分页结果，确保汇总准确
+        return filteredBills.filter { bill in
+            let formatter = DateFormatter()
+            formatter.dateFormat = "yyyy-MM-dd"
+            return formatter.string(from: bill.createdAt) == dateString
+        }
     }
     
     // 是否有激活的筛选条件
@@ -374,6 +496,27 @@ struct BillListView: View {
         selectedPaymentMethodIds.removeAll()
         startDate = nil
         endDate = nil
+        clearCache()
+    }
+    
+    // 加载更多账单
+    private func loadMoreBills() {
+        guard !isLoadingMore else { return }
+        guard paginatedBills.count < filteredBills.count else { return }
+        
+        isLoadingMore = true
+        
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+            displayedBillsCount += 50
+            isLoadingMore = false
+        }
+    }
+    
+    // 清除缓存
+    private func clearCache() {
+        cachedFilteredBills.removeAll()
+        cacheKey = ""
+        displayedBillsCount = 50
     }
     
     /// 处理支付方式名称显示，去掉"归属人-"前缀
