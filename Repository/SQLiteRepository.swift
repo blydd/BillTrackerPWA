@@ -279,20 +279,38 @@ class SQLiteRepository: DataRepository {
         }
         defer { sqlite3_finalize(statement) }
         
-        sqlite3_bind_text(statement, 1, "\(bill.amount)", -1, nil)
-        sqlite3_bind_text(statement, 2, bill.paymentMethodId.uuidString, -1, nil)
-        sqlite3_bind_text(statement, 3, bill.ownerId.uuidString, -1, nil)
+        "\(bill.amount)".withCString { amountPtr in
+            sqlite3_bind_text(statement, 1, amountPtr, -1, unsafeBitCast(-1, to: sqlite3_destructor_type.self))
+        }
+        bill.paymentMethodId.uuidString.withCString { pmPtr in
+            sqlite3_bind_text(statement, 2, pmPtr, -1, unsafeBitCast(-1, to: sqlite3_destructor_type.self))
+        }
+        bill.ownerId.uuidString.withCString { ownerPtr in
+            sqlite3_bind_text(statement, 3, ownerPtr, -1, unsafeBitCast(-1, to: sqlite3_destructor_type.self))
+        }
         if let note = bill.note {
-            sqlite3_bind_text(statement, 4, note, -1, nil)
+            note.withCString { notePtr in
+                sqlite3_bind_text(statement, 4, notePtr, -1, unsafeBitCast(-1, to: sqlite3_destructor_type.self))
+            }
         } else {
             sqlite3_bind_null(statement, 4)
         }
-        sqlite3_bind_text(statement, 5, ISO8601DateFormatter().string(from: bill.updatedAt), -1, nil)
-        sqlite3_bind_text(statement, 6, bill.id.uuidString, -1, nil)
+        ISO8601DateFormatter().string(from: bill.updatedAt).withCString { updatedPtr in
+            sqlite3_bind_text(statement, 5, updatedPtr, -1, unsafeBitCast(-1, to: sqlite3_destructor_type.self))
+        }
+        bill.id.uuidString.withCString { idPtr in
+            sqlite3_bind_text(statement, 6, idPtr, -1, unsafeBitCast(-1, to: sqlite3_destructor_type.self))
+        }
+        
+        print("📝 更新账单: ID=\(bill.id), 金额=\(bill.amount)")
         
         guard sqlite3_step(statement) == SQLITE_DONE else {
+            let errorMessage = String(cString: sqlite3_errmsg(db))
+            print("❌ 更新账单失败: \(errorMessage)")
             throw SQLiteError.executeFailed
         }
+        
+        print("✅ 账单更新成功")
         
         // 更新账单类型关联
         try deleteBillCategories(billId: bill.id)
@@ -421,9 +439,13 @@ class SQLiteRepository: DataRepository {
         }
         defer { sqlite3_finalize(statement) }
         
-        sqlite3_bind_text(statement, 1, billId.uuidString, -1, nil)
+        billId.uuidString.withCString { idPtr in
+            sqlite3_bind_text(statement, 1, idPtr, -1, unsafeBitCast(-1, to: sqlite3_destructor_type.self))
+        }
         
         guard sqlite3_step(statement) == SQLITE_DONE else {
+            let errorMessage = String(cString: sqlite3_errmsg(db))
+            print("❌ 删除账单分类关联失败: \(errorMessage)")
             throw SQLiteError.executeFailed
         }
     }

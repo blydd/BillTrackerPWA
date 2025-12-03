@@ -389,7 +389,8 @@ struct BillListView: View {
         let categoryKey = selectedCategoryIds.sorted().map { $0.uuidString }.joined(separator: ",")
         let paymentKey = selectedPaymentMethodIds.sorted().map { $0.uuidString }.joined(separator: ",")
         let dateKey = "\(startDate?.timeIntervalSince1970 ?? 0)-\(endDate?.timeIntervalSince1970 ?? 0)"
-        let billsKey = "\(billViewModel.bills.count)"
+        // 使用账单数量和最后更新时间作为缓存键的一部分
+        let billsKey = "\(billViewModel.bills.count)-\(billViewModel.bills.map { $0.updatedAt.timeIntervalSince1970 }.max() ?? 0)"
         return "\(ownerKey)|\(categoryKey)|\(paymentKey)|\(dateKey)|\(billsKey)"
     }
     
@@ -552,6 +553,10 @@ struct BillListView: View {
         await categoryViewModel.loadCategories()
         await ownerViewModel.loadOwners()
         await paymentViewModel.loadPaymentMethods()
+        
+        // 清空缓存，强制重新计算
+        cachedFilteredBills = []
+        cacheKey = ""
     }
     
     private func exportBills() {

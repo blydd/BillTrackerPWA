@@ -24,8 +24,10 @@ class BillViewModel: ObservableObject {
         
         do {
             bills = try await repository.fetchBills()
+            print("📋 加载账单完成: 共 \(bills.count) 条")
         } catch {
             errorMessage = "加载账单失败: \(error.localizedDescription)"
+            print("❌ 加载账单失败: \(error)")
         }
         
         isLoading = false
@@ -442,12 +444,15 @@ class BillViewModel: ObservableObject {
         isCreating: Bool,
         billOwnerId: UUID
     ) async throws {
+        print("💰 更新支付方式余额: \(paymentMethod.name), 金额: \(amount)")
+        
         var updatedMethod = paymentMethod
         
         switch paymentMethod {
         case .credit(var creditMethod):
             // 验证信贷方式的归属人是否与账单的归属人匹配
             guard creditMethod.ownerId == billOwnerId else {
+                print("❌ 归属人不匹配")
                 throw AppError.ownerMismatch
             }
             
@@ -455,10 +460,14 @@ class BillViewModel: ObservableObject {
             // 金额为负数表示支出，正数表示收入
             // 支出（负数）：增加欠费
             // 收入（正数）：减少欠费
+            let oldBalance = creditMethod.outstandingBalance
             let newBalance = creditMethod.outstandingBalance - amount
+            
+            print("  信贷: 旧欠费=\(oldBalance), 新欠费=\(newBalance)")
             
             // 检查是否超过信用额度 (Requirement 6.2)
             if newBalance > creditMethod.creditLimit {
+                print("❌ 超过信用额度")
                 throw AppError.creditLimitExceeded
             }
             
@@ -468,6 +477,7 @@ class BillViewModel: ObservableObject {
         case .savings(var savingsMethod):
             // 验证储蓄方式的归属人是否与账单的归属人匹配
             guard savingsMethod.ownerId == billOwnerId else {
+                print("❌ 归属人不匹配")
                 throw AppError.ownerMismatch
             }
             
@@ -475,11 +485,17 @@ class BillViewModel: ObservableObject {
             // 金额为负数表示支出，正数表示收入
             // 支出（负数）：减少余额
             // 收入（正数）：增加余额
+            let oldBalance = savingsMethod.balance
             savingsMethod.balance += amount
+            let newBalance = savingsMethod.balance
+            
+            print("  储蓄: 旧余额=\(oldBalance), 新余额=\(newBalance)")
+            
             updatedMethod = .savings(savingsMethod)
         }
         
         // 保存更新后的支付方式
         try await repository.updatePaymentMethod(updatedMethod)
+        print("✅ 支付方式余额更新完成")
     }
 }
