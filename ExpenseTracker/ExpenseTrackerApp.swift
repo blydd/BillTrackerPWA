@@ -2,11 +2,30 @@ import SwiftUI
 
 @main
 struct ExpenseTrackerApp: App {
-    private let repository = UserDefaultsRepository()
+    private let repository: DataRepository
+    
+    init() {
+        // 初始化 SQLite 数据仓库
+        self.repository = Self.setupRepository()
+    }
     
     var body: some Scene {
         WindowGroup {
             ContentView(repository: repository)
+        }
+    }
+    
+    /// 设置数据仓库
+    private static func setupRepository() -> DataRepository {
+        do {
+            let sqliteRepo = try SQLiteRepository()
+            print("✅ SQLite 数据库初始化成功")
+            return sqliteRepo
+        } catch {
+            print("❌ SQLite 初始化失败: \(error)")
+            print("⚠️ 回退到 UserDefaults")
+            // 回退到 UserDefaults 而不是崩溃
+            return UserDefaultsRepository()
         }
     }
 }
@@ -68,6 +87,17 @@ struct SettingsView: View {
                         Spacer()
                         Image(systemName: "arrow.clockwise")
                             .foregroundColor(.orange)
+                    }
+                }
+                
+                NavigationLink {
+                    DatabaseInfoView()
+                } label: {
+                    HStack {
+                        Text("数据库信息")
+                        Spacer()
+                        Image(systemName: "info.circle")
+                            .foregroundColor(.blue)
                     }
                 }
             }

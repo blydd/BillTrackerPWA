@@ -21,17 +21,25 @@ class InitializationViewModel: ObservableObject {
         errorMessage = nil
         
         do {
-            // 1. 清除所有现有数据
-            try await clearAllData()
+            // 1. 直接清空数据库（使用 SQL DELETE）
+            print("🔄 开始清空数据库...")
+            try await clearDatabaseDirectly()
+            print("✅ 数据库清空完成")
             
             // 2. 初始化账单类型
+            print("🔄 开始初始化账单类型...")
             try await initializeCategories()
+            print("✅ 账单类型初始化完成")
             
             // 3. 初始化归属人
+            print("🔄 开始初始化归属人...")
             try await initializeOwners()
+            print("✅ 归属人初始化完成")
             
             // 4. 初始化支付方式
+            print("🔄 开始初始化支付方式...")
             try await initializePaymentMethods()
+            print("✅ 支付方式初始化完成")
             
         } catch {
             errorMessage = "初始化失败: \(error.localizedDescription)"
@@ -43,32 +51,49 @@ class InitializationViewModel: ObservableObject {
     
     // MARK: - Private Methods
     
+    /// 直接清空数据库（使用 SQL DELETE）
+    private func clearDatabaseDirectly() async throws {
+        // 如果 repository 是 SQLiteRepository，使用 SQL 直接删除
+        if let sqliteRepo = repository as? SQLiteRepository {
+            try await sqliteRepo.clearAllTables()
+        } else {
+            // 否则使用传统方法
+            try await clearAllData()
+        }
+    }
+    
     /// 清除所有数据
     private func clearAllData() async throws {
-        // 获取所有数据
-        let bills = try await repository.fetchBills()
-        let categories = try await repository.fetchCategories()
-        let owners = try await repository.fetchOwners()
-        let paymentMethods = try await repository.fetchPaymentMethods()
-        
-        // 删除所有账单
-        for bill in bills {
-            try await repository.deleteBill(bill)
-        }
-        
-        // 删除所有账单类型
-        for category in categories {
-            try await repository.deleteCategory(category)
-        }
-        
-        // 删除所有归属人
-        for owner in owners {
-            try await repository.deleteOwner(owner)
-        }
-        
-        // 删除所有支付方式
-        for method in paymentMethods {
-            try await repository.deletePaymentMethod(method)
+        do {
+            // 获取所有数据
+            let bills = try await repository.fetchBills()
+            let paymentMethods = try await repository.fetchPaymentMethods()
+            let categories = try await repository.fetchCategories()
+            let owners = try await repository.fetchOwners()
+            
+            // 按照外键依赖顺序删除
+            // 1. 先删除账单（依赖支付方式和归属人）
+            for bill in bills {
+                try await repository.deleteBill(bill)
+            }
+            
+            // 2. 删除支付方式（依赖归属人）
+            for method in paymentMethods {
+                try await repository.deletePaymentMethod(method)
+            }
+            
+            // 3. 删除账单类型（无依赖）
+            for category in categories {
+                try await repository.deleteCategory(category)
+            }
+            
+            // 4. 最后删除归属人（被支付方式依赖）
+            for owner in owners {
+                try await repository.deleteOwner(owner)
+            }
+        } catch {
+            // 如果是空数据库，忽略错误继续
+            print("⚠️ 清除数据时出错（可能是空数据库）: \(error)")
         }
     }
     
@@ -82,6 +107,7 @@ class InitializationViewModel: ObservableObject {
         
         for name in expenseCategories {
             let category = BillCategory(name: name, transactionType: .expense)
+            print("  📝 保存支出分类: \(name), ID: \(category.id)")
             try await repository.saveCategory(category)
         }
         
@@ -116,17 +142,23 @@ class InitializationViewModel: ObservableObject {
     private func initializePaymentMethods() async throws {
         // 获取归属人列表
         let owners = try await repository.fetchOwners()
+        print("📋 获取到 \(owners.count) 个归属人")
         
         // 找到"男主"和"女主"
         guard let maleOwner = owners.first(where: { $0.name == "男主" }),
               let femaleOwner = owners.first(where: { $0.name == "女主" }) else {
+            print("❌ 未找到男主或女主")
             throw AppError.missingOwner
         }
+        
+        print("✅ 找到男主: \(maleOwner.id), 女主: \(femaleOwner.id)")
         
         // 为"男主"和"女主"各创建一套支付方式
         let targetOwners = [maleOwner, femaleOwner]
         
         for owner in targetOwners {
+            print("🔄 为 \(owner.name) 创建支付方式...")
+            
             // 信贷方式
             let creditMethods = [
                 "花呗", "白条", "招商信用卡", "广发信用卡",
@@ -142,6 +174,7 @@ class InitializationViewModel: ObservableObject {
                     billingDate: 1,
                     ownerId: owner.id
                 )
+                print("  💳 保存信贷: \(method.name)")
                 try await repository.savePaymentMethod(.credit(method))
             }
             
@@ -155,6 +188,7 @@ class InitializationViewModel: ObservableObject {
                     balance: 0,
                     ownerId: owner.id
                 )
+                print("  💰 保存储蓄: \(method.name)")
                 try await repository.savePaymentMethod(.savings(method))
             }
         }
