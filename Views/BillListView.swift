@@ -9,7 +9,6 @@ struct BillListView: View {
     @StateObject private var exportViewModel: ExportViewModel
     
     @State private var showingAddSheet = false
-    @State private var showingEditSheet = false
     @State private var showingError = false
     @State private var showingExportSheet = false
     @State private var exportedFileURL: URL?
@@ -154,28 +153,27 @@ struct BillListView: View {
                                                         paymentMethods: paymentViewModel.paymentMethods,
                                                         onEdit: { bill in
                                                             editingBill = bill
-                                                            showingEditSheet = true
                                                         }
                                                     )
                                                     .padding(.horizontal)
-                                                    .swipeActions(edge: .trailing, allowsFullSwipe: false) {
-                                                        Button(role: .destructive) {
-                                                            Task {
-                                                                do {
-                                                                    try await billViewModel.deleteBill(bill)
-                                                                } catch {
-                                                                    showingError = true
-                                                                }
-                                                            }
-                                                        } label: {
-                                                            Label("删除", systemImage: "trash")
-                                                        }
-                                                    }
                                                     
                                                     Divider()
                                                         .padding(.leading)
                                                 }
                                                 .background(Color(.systemBackground))
+                                                .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                                                    Button(role: .destructive) {
+                                                        Task {
+                                                            do {
+                                                                try await billViewModel.deleteBill(bill)
+                                                            } catch {
+                                                                showingError = true
+                                                            }
+                                                        }
+                                                    } label: {
+                                                        Label("删除", systemImage: "trash")
+                                                    }
+                                                }
                                             }
                                         } header: {
                                             HStack {
@@ -293,20 +291,17 @@ struct BillListView: View {
                 }
             }
         }
-        .sheet(isPresented: $showingEditSheet) {
-            if let bill = editingBill {
-                BillFormView(
-                    repository: repository,
-                    categories: categoryViewModel.categories,
-                    owners: ownerViewModel.owners,
-                    paymentMethods: paymentViewModel.paymentMethods,
-                    editingBill: bill
-                ) {
-                    // 编辑账单后刷新列表
-                    Task {
-                        await loadData()
-                    }
-                    editingBill = nil
+        .sheet(item: $editingBill) { bill in
+            BillFormView(
+                repository: repository,
+                categories: categoryViewModel.categories,
+                owners: ownerViewModel.owners,
+                paymentMethods: paymentViewModel.paymentMethods,
+                editingBill: bill
+            ) {
+                // 编辑账单后刷新列表
+                Task {
+                    await loadData()
                 }
             }
         }

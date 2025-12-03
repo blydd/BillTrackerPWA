@@ -393,14 +393,22 @@ class SQLiteRepository: DataRepository {
         }
         defer { sqlite3_finalize(statement) }
         
-        sqlite3_bind_text(statement, 1, billId.uuidString, -1, nil)
+        billId.uuidString.withCString { idPtr in
+            sqlite3_bind_text(statement, 1, idPtr, -1, unsafeBitCast(-1, to: sqlite3_destructor_type.self))
+        }
         
         var categoryIds: [UUID] = []
         while sqlite3_step(statement) == SQLITE_ROW {
-            let categoryId = UUID(uuidString: String(cString: sqlite3_column_text(statement, 0)))!
-            categoryIds.append(categoryId)
+            do {
+                let categoryId = try getUUID(from: statement, at: 0)
+                categoryIds.append(categoryId)
+            } catch {
+                print("⚠️ 跳过无效的分类ID")
+                continue
+            }
         }
         
+        print("📋 查询账单分类: 账单ID=\(billId), 找到 \(categoryIds.count) 个分类")
         return categoryIds
     }
     
@@ -534,27 +542,45 @@ class SQLiteRepository: DataRepository {
         }
         defer { sqlite3_finalize(statement) }
         
-        sqlite3_bind_text(statement, 1, method.name, -1, nil)
-        sqlite3_bind_text(statement, 2, method.transactionType.rawValue, -1, nil)
+        method.name.withCString { namePtr in
+            sqlite3_bind_text(statement, 1, namePtr, -1, unsafeBitCast(-1, to: sqlite3_destructor_type.self))
+        }
+        method.transactionType.rawValue.withCString { typePtr in
+            sqlite3_bind_text(statement, 2, typePtr, -1, unsafeBitCast(-1, to: sqlite3_destructor_type.self))
+        }
         
         switch method {
         case .credit(let credit):
-            sqlite3_bind_text(statement, 3, "\(credit.creditLimit)", -1, nil)
-            sqlite3_bind_text(statement, 4, "\(credit.outstandingBalance)", -1, nil)
+            "\(credit.creditLimit)".withCString { limitPtr in
+                sqlite3_bind_text(statement, 3, limitPtr, -1, unsafeBitCast(-1, to: sqlite3_destructor_type.self))
+            }
+            "\(credit.outstandingBalance)".withCString { balancePtr in
+                sqlite3_bind_text(statement, 4, balancePtr, -1, unsafeBitCast(-1, to: sqlite3_destructor_type.self))
+            }
             sqlite3_bind_int(statement, 5, Int32(credit.billingDate))
             sqlite3_bind_null(statement, 6)
         case .savings(let savings):
             sqlite3_bind_null(statement, 3)
             sqlite3_bind_null(statement, 4)
             sqlite3_bind_null(statement, 5)
-            sqlite3_bind_text(statement, 6, "\(savings.balance)", -1, nil)
+            "\(savings.balance)".withCString { balancePtr in
+                sqlite3_bind_text(statement, 6, balancePtr, -1, unsafeBitCast(-1, to: sqlite3_destructor_type.self))
+            }
         }
         
-        sqlite3_bind_text(statement, 7, method.id.uuidString, -1, nil)
+        method.id.uuidString.withCString { idPtr in
+            sqlite3_bind_text(statement, 7, idPtr, -1, unsafeBitCast(-1, to: sqlite3_destructor_type.self))
+        }
+        
+        print("💳 更新支付方式: \(method.name)")
         
         guard sqlite3_step(statement) == SQLITE_DONE else {
+            let errorMessage = String(cString: sqlite3_errmsg(db))
+            print("❌ 更新支付方式失败: \(errorMessage)")
             throw SQLiteError.executeFailed
         }
+        
+        print("✅ 支付方式更新成功")
     }
     
     func deletePaymentMethod(_ method: PaymentMethodWrapper) async throws {
