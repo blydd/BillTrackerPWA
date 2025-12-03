@@ -26,6 +26,7 @@ struct StatisticsView: View {
                 }
                 .pickerStyle(.segmented)
             }
+            .listRowBackground(Color.clear)
             
             Section("总览") {
                 HStack {
@@ -92,6 +93,9 @@ struct StatisticsView: View {
                     }
                 }
             }
+        }
+        .refreshable {
+            await loadStatistics()
         }
         .navigationTitle("统计分析")
         .toolbar {

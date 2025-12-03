@@ -9,10 +9,14 @@ struct BillListView: View {
     @StateObject private var exportViewModel: ExportViewModel
     
     @State private var showingAddSheet = false
+    @State private var showingEditSheet = false
     @State private var showingError = false
     @State private var showingExportSheet = false
     @State private var exportedFileURL: URL?
     @State private var showingFilterSheet = false
+    @State private var isFilterExpanded = true
+    @State private var showScrollToTopButton = false
+    @State private var editingBill: Bill?
     
     // 筛选条件
     @State private var selectedOwnerIds: Set<UUID> = []
@@ -36,97 +40,148 @@ struct BillListView: View {
     
     var body: some View {
         VStack(spacing: 0) {
-            // 筛选条件显示区域
+            // 筛选条件显示区域（可折叠）
             if hasActiveFilters {
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 8) {
-                        // 归属人筛选标签
-                        ForEach(Array(selectedOwnerIds), id: \.self) { ownerId in
-                            if let owner = ownerViewModel.owners.first(where: { $0.id == ownerId }) {
-                                FilterTagView(text: owner.name, color: .green) {
-                                    selectedOwnerIds.remove(ownerId)
-                                    // 清空支付方式筛选
-                                    selectedPaymentMethodIds.removeAll()
-                                }
-                            }
+                VStack(spacing: 0) {
+                    // 折叠/展开按钮
+                    Button(action: {
+                        withAnimation(.spring(response: 0.3)) {
+                            isFilterExpanded.toggle()
                         }
-                        
-                        // 账单类型筛选标签
-                        ForEach(Array(selectedCategoryIds), id: \.self) { categoryId in
-                            if let category = categoryViewModel.categories.first(where: { $0.id == categoryId }) {
-                                FilterTagView(text: category.name, color: .orange) {
-                                    selectedCategoryIds.remove(categoryId)
-                                }
-                            }
+                    }) {
+                        HStack {
+                            Text("筛选条件")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                            Spacer()
+                            Image(systemName: isFilterExpanded ? "chevron.up" : "chevron.down")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
                         }
-                        
-                        // 支付方式筛选标签
-                        ForEach(Array(selectedPaymentMethodIds), id: \.self) { methodId in
-                            if let method = paymentViewModel.paymentMethods.first(where: { $0.id == methodId }) {
-                                FilterTagView(text: displayPaymentMethodName(method.name), color: .blue) {
-                                    selectedPaymentMethodIds.remove(methodId)
-                                }
-                            }
-                        }
-                        
-                        // 日期范围标签
-                        if startDate != nil || endDate != nil {
-                            FilterTagView(text: dateRangeText, color: .purple) {
-                                startDate = nil
-                                endDate = nil
-                            }
-                        }
-                        
-                        // 清空所有筛选
-                        Button(action: clearAllFilters) {
-                            HStack(spacing: 4) {
-                                Image(systemName: "xmark.circle.fill")
-                                Text("清空")
-                            }
-                            .font(.caption)
-                            .padding(.horizontal, 12)
-                            .padding(.vertical, 6)
-                            .background(Color.red.opacity(0.2))
-                            .foregroundColor(.red)
-                            .cornerRadius(16)
-                        }
+                        .padding(.horizontal)
+                        .padding(.vertical, 8)
                     }
-                    .padding(.horizontal)
+                    
+                    if isFilterExpanded {
+                        ScrollView(.horizontal, showsIndicators: false) {
+                            HStack(spacing: 8) {
+                                // 归属人筛选标签
+                                ForEach(Array(selectedOwnerIds), id: \.self) { ownerId in
+                                    if let owner = ownerViewModel.owners.first(where: { $0.id == ownerId }) {
+                                        FilterTagView(text: owner.name, color: .green) {
+                                            selectedOwnerIds.remove(ownerId)
+                                            selectedPaymentMethodIds.removeAll()
+                                        }
+                                    }
+                                }
+                                
+                                // 账单类型筛选标签
+                                ForEach(Array(selectedCategoryIds), id: \.self) { categoryId in
+                                    if let category = categoryViewModel.categories.first(where: { $0.id == categoryId }) {
+                                        FilterTagView(text: category.name, color: .orange) {
+                                            selectedCategoryIds.remove(categoryId)
+                                        }
+                                    }
+                                }
+                                
+                                // 支付方式筛选标签
+                                ForEach(Array(selectedPaymentMethodIds), id: \.self) { methodId in
+                                    if let method = paymentViewModel.paymentMethods.first(where: { $0.id == methodId }) {
+                                        FilterTagView(text: displayPaymentMethodName(method.name), color: .blue) {
+                                            selectedPaymentMethodIds.remove(methodId)
+                                        }
+                                    }
+                                }
+                                
+                                // 日期范围标签
+                                if startDate != nil || endDate != nil {
+                                    FilterTagView(text: dateRangeText, color: .purple) {
+                                        startDate = nil
+                                        endDate = nil
+                                    }
+                                }
+                                
+                                // 清空所有筛选
+                                Button(action: clearAllFilters) {
+                                    HStack(spacing: 4) {
+                                        Image(systemName: "xmark.circle.fill")
+                                        Text("清空")
+                                    }
+                                    .font(.caption)
+                                    .padding(.horizontal, 12)
+                                    .padding(.vertical, 6)
+                                    .background(Color.red.opacity(0.2))
+                                    .foregroundColor(.red)
+                                    .cornerRadius(16)
+                                }
+                            }
+                            .padding(.horizontal)
+                        }
+                        .padding(.bottom, 8)
+                        .transition(.opacity.combined(with: .move(edge: .top)))
+                    }
                 }
-                .padding(.vertical, 8)
                 .background(Color(.systemGroupedBackground))
             }
             
             // 账单列表
-            Group {
-                if filteredBills.isEmpty {
-                    EmptyStateView(
-                        icon: "doc.text",
-                        title: billViewModel.bills.isEmpty ? "暂无账单" : "无符合条件的账单",
-                        message: billViewModel.bills.isEmpty ? "点击右上角的 + 按钮创建第一条账单记录" : "尝试调整筛选条件"
-                    )
-                } else {
-                    List {
-                        ForEach(groupedFilteredBills.keys.sorted(by: >), id: \.self) { date in
-                            Section {
-                                ForEach(groupedFilteredBills[date] ?? []) { bill in
-                                    BillRowView(
-                                        bill: bill,
-                                        categories: categoryViewModel.categories,
-                                        owners: ownerViewModel.owners,
-                                        paymentMethods: paymentViewModel.paymentMethods
-                                    )
+            ZStack(alignment: .bottomTrailing) {
+                Group {
+                    if filteredBills.isEmpty {
+                        EmptyStateView(
+                            icon: "doc.text",
+                            title: billViewModel.bills.isEmpty ? "暂无账单" : "无符合条件的账单",
+                            message: billViewModel.bills.isEmpty ? "点击右上角的 + 按钮创建第一条账单记录" : "尝试调整筛选条件"
+                        )
+                    } else {
+                        ScrollViewReader { proxy in
+                            List {
+                                ForEach(groupedFilteredBills.keys.sorted(by: >), id: \.self) { date in
+                                    Section {
+                                        ForEach(groupedFilteredBills[date] ?? []) { bill in
+                                            BillRowView(
+                                                bill: bill,
+                                                categories: categoryViewModel.categories,
+                                                owners: ownerViewModel.owners,
+                                                paymentMethods: paymentViewModel.paymentMethods,
+                                                onEdit: { bill in
+                                                    editingBill = bill
+                                                    showingEditSheet = true
+                                                }
+                                            )
+                                        }
+                                        .onDelete { offsets in
+                                            deleteBillsInSection(date: date, at: offsets)
+                                        }
+                                    } header: {
+                                        DailySummaryHeader(
+                                            date: date,
+                                            bills: groupedFilteredBills[date] ?? [],
+                                            paymentMethods: paymentViewModel.paymentMethods,
+                                            categories: categoryViewModel.categories
+                                        )
+                                        .id(date == groupedFilteredBills.keys.sorted(by: >).first ? "top" : nil)
+                                    }
                                 }
-                                .onDelete { offsets in
-                                    deleteBillsInSection(date: date, at: offsets)
+                            }
+                            .onChange(of: filteredBills.count) { _, _ in
+                                showScrollToTopButton = filteredBills.count > 10
+                            }
+                            .overlay(alignment: .bottomTrailing) {
+                                if showScrollToTopButton {
+                                    Button(action: {
+                                        withAnimation {
+                                            proxy.scrollTo("top", anchor: .top)
+                                        }
+                                    }) {
+                                        Image(systemName: "arrow.up.circle.fill")
+                                            .font(.system(size: 44))
+                                            .foregroundColor(.blue)
+                                            .background(Circle().fill(Color.white))
+                                            .shadow(radius: 4)
+                                    }
+                                    .padding()
                                 }
-                            } header: {
-                                DailySummaryHeader(
-                                    date: date,
-                                    bills: groupedFilteredBills[date] ?? [],
-                                    paymentMethods: paymentViewModel.paymentMethods,
-                                    categories: categoryViewModel.categories
-                                )
                             }
                         }
                     }
@@ -184,6 +239,23 @@ struct BillListView: View {
                 // 添加账单后刷新列表
                 Task {
                     await loadData()
+                }
+            }
+        }
+        .sheet(isPresented: $showingEditSheet) {
+            if let bill = editingBill {
+                BillFormView(
+                    repository: repository,
+                    categories: categoryViewModel.categories,
+                    owners: ownerViewModel.owners,
+                    paymentMethods: paymentViewModel.paymentMethods,
+                    editingBill: bill
+                ) {
+                    // 编辑账单后刷新列表
+                    Task {
+                        await loadData()
+                    }
+                    editingBill = nil
                 }
             }
         }
@@ -469,74 +541,79 @@ struct BillRowView: View {
     let categories: [BillCategory]
     let owners: [Owner]
     let paymentMethods: [PaymentMethodWrapper]
+    let onEdit: ((Bill) -> Void)?
+    
+    init(bill: Bill,
+         categories: [BillCategory],
+         owners: [Owner],
+         paymentMethods: [PaymentMethodWrapper],
+         onEdit: ((Bill) -> Void)? = nil) {
+        self.bill = bill
+        self.categories = categories
+        self.owners = owners
+        self.paymentMethods = paymentMethods
+        self.onEdit = onEdit
+    }
     
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            // 金额和时间
-            HStack {
+        VStack(alignment: .leading, spacing: 4) {
+            // 第一行：金额、时间和编辑按钮
+            HStack(alignment: .center) {
                 Text("¥\(bill.amount as NSDecimalNumber, formatter: amountFormatter)")
-                    .font(.headline)
+                    .font(.system(size: 16, weight: .semibold))
                     .foregroundColor(transactionColor)
+                
                 Spacer()
+                
                 Text(formattedDateTime)
-                    .font(.caption)
+                    .font(.system(size: 11))
                     .foregroundColor(.secondary)
-            }
-            
-            // 归属人标签
-            if let owner = owners.first(where: { $0.id == bill.ownerId }) {
-                HStack(spacing: 4) {
-                    Text("归属人:")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                    TagView(text: owner.name, color: .green)
+                
+                if let onEdit = onEdit {
+                    Button(action: { onEdit(bill) }) {
+                        Image(systemName: "pencil.circle")
+                            .font(.system(size: 16))
+                            .foregroundColor(.blue)
+                    }
+                    .buttonStyle(.plain)
                 }
             }
             
-            // 支付方式标签
-            if let payment = paymentMethods.first(where: { $0.id == bill.paymentMethodId }) {
-                HStack(spacing: 4) {
-                    Text("支付方式:")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                    TagView(text: displayPaymentMethodName(payment.name), color: .blue)
+            // 第二行：归属人和支付方式
+            HStack(spacing: 8) {
+                if let owner = owners.first(where: { $0.id == bill.ownerId }) {
+                    CompactTagView(text: owner.name, color: .green)
+                }
+                
+                if let payment = paymentMethods.first(where: { $0.id == bill.paymentMethodId }) {
+                    CompactTagView(text: displayPaymentMethodName(payment.name), color: .blue)
                 }
             }
             
-            // 账单类型标签
+            // 第三行：账单类型
             let categoryList = bill.categoryIds.compactMap { id in
                 categories.first(where: { $0.id == id })
             }
             
             if !categoryList.isEmpty {
-                HStack(spacing: 4) {
-                    Text("类型:")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                    
-                    ScrollView(.horizontal, showsIndicators: false) {
-                        HStack(spacing: 6) {
-                            ForEach(categoryList) { category in
-                                TagView(text: category.name, color: .orange)
-                            }
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 4) {
+                        ForEach(categoryList) { category in
+                            CompactTagView(text: category.name, color: .orange)
                         }
                     }
                 }
             }
             
-            // 备注
+            // 备注（如果有）
             if let note = bill.note, !note.isEmpty {
-                HStack(alignment: .top, spacing: 4) {
-                    Text("备注:")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                    Text(note)
-                        .font(.caption)
-                        .foregroundColor(.primary)
-                }
+                Text(note)
+                    .font(.system(size: 11))
+                    .foregroundColor(.secondary)
+                    .lineLimit(2)
             }
         }
-        .padding(.vertical, 4)
+        .padding(.vertical, 6)
     }
     
     // 格式化日期时间为 yyyy-MM-dd HH:mm:ss
@@ -594,6 +671,22 @@ struct TagView: View {
             .background(color.opacity(0.2))
             .foregroundColor(color)
             .cornerRadius(8)
+    }
+}
+
+/// 紧凑标签视图组件（用于账单列表）
+struct CompactTagView: View {
+    let text: String
+    let color: Color
+    
+    var body: some View {
+        Text(text)
+            .font(.system(size: 11))
+            .padding(.horizontal, 6)
+            .padding(.vertical, 2)
+            .background(color.opacity(0.15))
+            .foregroundColor(color)
+            .cornerRadius(4)
     }
 }
 
@@ -716,6 +809,34 @@ struct FilterSheetView: View {
                             }
                         }
                         .padding(.horizontal)
+                        
+                        // 支付方式筛选（显示在归属人下面）
+                        if !selectedOwnerIds.isEmpty {
+                            VStack(alignment: .leading, spacing: 8) {
+                                Text("支付方式")
+                                    .font(.subheadline)
+                                    .foregroundColor(.secondary)
+                                    .padding(.horizontal)
+                                    .padding(.top, 8)
+                                
+                                FlowLayout(spacing: 8) {
+                                    ForEach(filteredPaymentMethods, id: \.id) { method in
+                                        SelectableFilterTag(
+                                            text: displayPaymentMethodName(method.name),
+                                            isSelected: selectedPaymentMethodIds.contains(method.id),
+                                            color: .blue
+                                        ) {
+                                            if selectedPaymentMethodIds.contains(method.id) {
+                                                selectedPaymentMethodIds.remove(method.id)
+                                            } else {
+                                                selectedPaymentMethodIds.insert(method.id)
+                                            }
+                                        }
+                                    }
+                                }
+                                .padding(.horizontal)
+                            }
+                        }
                     }
                     
                     Divider()
@@ -742,34 +863,6 @@ struct FilterSheetView: View {
                             }
                         }
                         .padding(.horizontal)
-                    }
-                    
-                    // 支付方式筛选（只有选择了归属人后才显示）
-                    if !selectedOwnerIds.isEmpty {
-                        Divider()
-                        
-                        VStack(alignment: .leading, spacing: 12) {
-                            Text("支付方式")
-                                .font(.headline)
-                                .padding(.horizontal)
-                            
-                            FlowLayout(spacing: 8) {
-                                ForEach(filteredPaymentMethods, id: \.id) { method in
-                                    SelectableFilterTag(
-                                        text: displayPaymentMethodName(method.name),
-                                        isSelected: selectedPaymentMethodIds.contains(method.id),
-                                        color: .blue
-                                    ) {
-                                        if selectedPaymentMethodIds.contains(method.id) {
-                                            selectedPaymentMethodIds.remove(method.id)
-                                        } else {
-                                            selectedPaymentMethodIds.insert(method.id)
-                                        }
-                                    }
-                                }
-                            }
-                            .padding(.horizontal)
-                        }
                     }
                     
                     Divider()

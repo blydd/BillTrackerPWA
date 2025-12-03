@@ -8,6 +8,7 @@ struct BillFormView: View {
     let categories: [BillCategory]
     let owners: [Owner]
     let paymentMethods: [PaymentMethodWrapper]
+    let editingBill: Bill?
     let onBillAdded: () -> Void
     
     @State private var selectedTransactionType: TransactionType = .expense
@@ -26,11 +27,13 @@ struct BillFormView: View {
          categories: [BillCategory],
          owners: [Owner],
          paymentMethods: [PaymentMethodWrapper],
+         editingBill: Bill? = nil,
          onBillAdded: @escaping () -> Void) {
         _billViewModel = StateObject(wrappedValue: BillViewModel(repository: repository))
         self.categories = categories
         self.owners = owners
         self.paymentMethods = paymentMethods
+        self.editingBill = editingBill
         self.onBillAdded = onBillAdded
     }
     
@@ -208,7 +211,7 @@ struct BillFormView: View {
                     }
                 }
             }
-            .navigationTitle("添加账单")
+            .navigationTitle(editingBill == nil ? "添加账单" : "编辑账单")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
@@ -231,9 +234,14 @@ struct BillFormView: View {
                 Text(errorMessage)
             }
             .onAppear {
-                // 页面出现时自动聚焦到金额输入框
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                    isAmountFocused = true
+                // 如果是编辑模式，填充数据
+                if let bill = editingBill {
+                    loadBillData(bill)
+                } else {
+                    // 页面出现时自动聚焦到金额输入框
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                        isAmountFocused = true
+                    }
                 }
             }
             .sheet(isPresented: $showingDatePicker) {
@@ -374,9 +382,10 @@ struct BillFormView: View {
         }
         
         do {
-            // 如果选择的是"不计入"tab，需要临时修改支付方式的交易类型
-            if selectedTransactionType == .excluded {
-                try await billViewModel.createBillWithExcludedType(
+            if let bill = editingBill {
+                // 编辑模式
+                try await billViewModel.updateBill(
+                    bill,
                     amount: amountValue,
                     paymentMethodId: paymentMethodId,
                     categoryIds: Array(selectedCategoryIds),
@@ -385,20 +394,57 @@ struct BillFormView: View {
                     createdAt: selectedDate
                 )
             } else {
-                try await billViewModel.createBill(
-                    amount: amountValue,
-                    paymentMethodId: paymentMethodId,
-                    categoryIds: Array(selectedCategoryIds),
-                    ownerId: ownerId,
-                    note: note.isEmpty ? nil : note,
-                    createdAt: selectedDate
-                )
+                // 创建模式
+                if selectedTransactionType == .excluded {
+                    try await billViewModel.createBillWithExcludedType(
+                        amount: amountValue,
+                        paymentMethodId: paymentMethodId,
+                        categoryIds: Array(selectedCategoryIds),
+                        ownerId: ownerId,
+                        note: note.isEmpty ? nil : note,
+                        createdAt: selectedDate
+                    )
+                } else {
+                    try await billViewModel.createBill(
+                        amount: amountValue,
+                        paymentMethodId: paymentMethodId,
+                        categoryIds: Array(selectedCategoryIds),
+                        ownerId: ownerId,
+                        note: note.isEmpty ? nil : note,
+                        createdAt: selectedDate
+                    )
+                }
             }
             onBillAdded() // 通知列表页刷新
             dismiss()
         } catch {
             errorMessage = error.localizedDescription
             showingError = true
+        }
+    }
+    
+    private func loadBillData(_ bill: Bill) {
+        // 填充金额
+        amount = String(describing: abs(bill.amount))
+        
+        // 填充支付方式
+        selectedPaymentMethodId = bill.paymentMethodId
+        
+        // 填充账单类型
+        selectedCategoryIds = Set(bill.categoryIds)
+        
+        // 填充归属人
+        selectedOwnerId = bill.ownerId
+        
+        // 填充备注
+        note = bill.note ?? ""
+        
+        // 填充日期
+        selectedDate = bill.createdAt
+        
+        // 判断交易类型
+        if let paymentMethod = paymentMethods.first(where: { $0.id == bill.paymentMethodId }) {
+            selectedTransactionType = paymentMethod.transactionType
         }
     }
 }

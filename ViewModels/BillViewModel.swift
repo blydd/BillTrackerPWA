@@ -287,6 +287,107 @@ class BillViewModel: ObservableObject {
         }
     }
     
+    // MARK: - Bill Update
+    
+    /// 更新账单
+    /// - Parameters:
+    ///   - bill: 原账单
+    ///   - amount: 新金额
+    ///   - paymentMethodId: 新支付方式ID
+    ///   - categoryIds: 新账单类型ID列表
+    ///   - ownerId: 新归属人ID
+    ///   - note: 新备注
+    ///   - createdAt: 新账单时间
+    /// - Throws: AppError 如果更新失败
+    func updateBill(
+        _ bill: Bill,
+        amount: Decimal,
+        paymentMethodId: UUID,
+        categoryIds: [UUID],
+        ownerId: UUID,
+        note: String? = nil,
+        createdAt: Date
+    ) async throws {
+        // 先恢复旧账单的余额影响
+        if let oldPaymentMethod = try await repository.fetchPaymentMethod(by: bill.paymentMethodId),
+           oldPaymentMethod.transactionType != .excluded {
+            try await updatePaymentMethodBalance(
+                paymentMethod: oldPaymentMethod,
+                amount: -bill.amount,
+                isCreating: false,
+                billOwnerId: bill.ownerId
+            )
+        }
+        
+        // 验证新数据
+        guard amount != 0 else {
+            throw AppError.invalidAmount
+        }
+        
+        guard try await repository.fetchPaymentMethod(by: paymentMethodId) != nil else {
+            throw AppError.missingPaymentMethod
+        }
+        
+        guard !categoryIds.isEmpty else {
+            throw AppError.missingCategory
+        }
+        
+        guard try await repository.fetchOwner(by: ownerId) != nil else {
+            throw AppError.missingOwner
+        }
+        
+        // 应用新账单的余额影响
+        if let newPaymentMethod = try await repository.fetchPaymentMethod(by: paymentMethodId),
+           newPaymentMethod.transactionType != .excluded {
+            try await updatePaymentMethodBalance(
+                paymentMethod: newPaymentMethod,
+                amount: amount,
+                isCreating: true,
+                billOwnerId: ownerId
+            )
+        }
+        
+        // 更新账单
+        let updatedBill = Bill(
+            id: bill.id,
+            amount: amount,
+            paymentMethodId: paymentMethodId,
+            categoryIds: categoryIds,
+            ownerId: ownerId,
+            note: note,
+            createdAt: createdAt,
+            updatedAt: Date()
+        )
+        
+        do {
+            try await repository.updateBill(updatedBill)
+            if let index = bills.firstIndex(where: { $0.id == bill.id }) {
+                bills[index] = updatedBill
+            }
+        } catch {
+            // 回滚余额变化
+            if let oldPaymentMethod = try? await repository.fetchPaymentMethod(by: bill.paymentMethodId),
+               oldPaymentMethod.transactionType != .excluded {
+                try? await updatePaymentMethodBalance(
+                    paymentMethod: oldPaymentMethod,
+                    amount: bill.amount,
+                    isCreating: true,
+                    billOwnerId: bill.ownerId
+                )
+            }
+            if let newPaymentMethod = try? await repository.fetchPaymentMethod(by: paymentMethodId),
+               newPaymentMethod.transactionType != .excluded {
+                try? await updatePaymentMethodBalance(
+                    paymentMethod: newPaymentMethod,
+                    amount: -amount,
+                    isCreating: false,
+                    billOwnerId: ownerId
+                )
+            }
+            throw AppError.persistenceError(underlying: error)
+        }
+    }
+    
     // MARK: - Bill Deletion
     
     /// 删除账单
