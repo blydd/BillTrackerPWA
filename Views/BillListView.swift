@@ -130,111 +130,73 @@ struct BillListView: View {
             }
             
             // 账单列表
-            ZStack(alignment: .bottomTrailing) {
-                Group {
-                    if filteredBills.isEmpty {
-                        EmptyStateView(
-                            icon: "doc.text",
-                            title: billViewModel.bills.isEmpty ? "暂无账单" : "无符合条件的账单",
-                            message: billViewModel.bills.isEmpty ? "点击右上角的 + 按钮创建第一条账单记录" : "尝试调整筛选条件"
-                        )
-                    } else {
-                        ScrollViewReader { proxy in
-                            ScrollView {
-                                LazyVStack(spacing: 0, pinnedViews: [.sectionHeaders]) {
-                                    ForEach(groupedFilteredBills.keys.sorted(by: >), id: \.self) { date in
-                                        Section {
-                                            ForEach(groupedFilteredBills[date] ?? []) { bill in
-                                                VStack(spacing: 0) {
-                                                    BillRowView(
-                                                        bill: bill,
-                                                        categories: categoryViewModel.categories,
-                                                        owners: ownerViewModel.owners,
-                                                        paymentMethods: paymentViewModel.paymentMethods,
-                                                        onEdit: { bill in
-                                                            editingBill = bill
-                                                        }
-                                                    )
-                                                    .padding(.horizontal)
-                                                    
-                                                    Divider()
-                                                        .padding(.leading)
-                                                }
-                                                .background(Color(.systemBackground))
-                                                .swipeActions(edge: .trailing, allowsFullSwipe: true) {
-                                                    Button(role: .destructive) {
-                                                        Task {
-                                                            do {
-                                                                try await billViewModel.deleteBill(bill)
-                                                            } catch {
-                                                                showingError = true
-                                                            }
-                                                        }
-                                                    } label: {
-                                                        Label("删除", systemImage: "trash")
-                                                    }
-                                                }
-                                            }
-                                        } header: {
-                                            HStack {
-                                                DailySummaryHeader(
-                                                    date: date,
-                                                    bills: getBillsForDate(date), // 使用完整的当天数据
-                                                    paymentMethods: paymentViewModel.paymentMethods,
-                                                    categories: categoryViewModel.categories
-                                                )
-                                                Spacer()
-                                            }
-                                            .padding(.horizontal)
-                                            .padding(.vertical, 8)
-                                            .background(Color(.systemGroupedBackground))
-                                            .id(date == groupedFilteredBills.keys.sorted(by: >).first ? "top" : nil)
-                                        }
+            if filteredBills.isEmpty {
+                EmptyStateView(
+                    icon: "doc.text",
+                    title: billViewModel.bills.isEmpty ? "暂无账单" : "无符合条件的账单",
+                    message: billViewModel.bills.isEmpty ? "点击右上角的 + 按钮创建第一条账单记录" : "尝试调整筛选条件"
+                )
+            } else {
+                List {
+                    ForEach(groupedFilteredBills.keys.sorted(by: >), id: \.self) { date in
+                        Section {
+                            ForEach(groupedFilteredBills[date] ?? []) { bill in
+                                BillRowView(
+                                    bill: bill,
+                                    categories: categoryViewModel.categories,
+                                    owners: ownerViewModel.owners,
+                                    paymentMethods: paymentViewModel.paymentMethods,
+                                    onEdit: { bill in
+                                        editingBill = bill
                                     }
-                                    
-                                    // 加载更多指示器
-                                    if paginatedBills.count < filteredBills.count {
-                                        HStack {
-                                            Spacer()
-                                            if isLoadingMore {
-                                                ProgressView()
-                                                    .padding()
-                                            } else {
-                                                Button("加载更多") {
-                                                    loadMoreBills()
-                                                }
-                                                .padding()
+                                )
+                                .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                                    Button(role: .destructive) {
+                                        Task {
+                                            do {
+                                                try await billViewModel.deleteBill(bill)
+                                                await loadData()
+                                            } catch {
+                                                showingError = true
                                             }
-                                            Spacer()
                                         }
-                                        .onAppear {
-                                            loadMoreBills()
-                                        }
+                                    } label: {
+                                        Label("删除", systemImage: "trash")
                                     }
                                 }
+                                .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
                             }
-                            .onChange(of: filteredBills.count) { _, _ in
-                                showScrollToTopButton = filteredBills.count > 10
-                            }
-                            .overlay(alignment: .bottomTrailing) {
-                                if showScrollToTopButton {
-                                    Button(action: {
-                                        withAnimation {
-                                            proxy.scrollTo("top", anchor: .top)
-                                        }
-                                    }) {
-                                        Image(systemName: "arrow.up.circle.fill")
-                                            .font(.system(size: 44))
-                                            .foregroundColor(.blue)
-                                            .background(Circle().fill(Color.white))
-                                            .shadow(radius: 4)
+                        } header: {
+                            DailySummaryHeader(
+                                date: date,
+                                bills: getBillsForDate(date),
+                                paymentMethods: paymentViewModel.paymentMethods,
+                                categories: categoryViewModel.categories
+                            )
+                        }
+                    }
+                    
+                    // 加载更多指示器
+                    if paginatedBills.count < filteredBills.count {
+                        Section {
+                            HStack {
+                                Spacer()
+                                if isLoadingMore {
+                                    ProgressView()
+                                } else {
+                                    Button("加载更多") {
+                                        loadMoreBills()
                                     }
-                                    .padding()
                                 }
+                                Spacer()
+                            }
+                            .onAppear {
+                                loadMoreBills()
                             }
                         }
                     }
                 }
+                .listStyle(.insetGrouped)
             }
         }
         .navigationBarTitleDisplayMode(.inline)
@@ -699,64 +661,60 @@ struct BillRowView: View {
     }
     
     var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
+        VStack(alignment: .leading, spacing: 6) {
             // 第一行：金额、时间和编辑按钮
             HStack(alignment: .center) {
                 Text("¥\(bill.amount as NSDecimalNumber, formatter: amountFormatter)")
-                    .font(.system(size: 16, weight: .semibold))
+                    .font(.system(size: 18, weight: .semibold))
                     .foregroundColor(transactionColor)
                 
                 Spacer()
                 
                 Text(formattedDateTime)
-                    .font(.system(size: 11))
+                    .font(.system(size: 13))
                     .foregroundColor(.secondary)
                 
                 if let onEdit = onEdit {
                     Button(action: { onEdit(bill) }) {
                         Image(systemName: "pencil.circle")
-                            .font(.system(size: 16))
+                            .font(.system(size: 18))
                             .foregroundColor(.blue)
                     }
                     .buttonStyle(.plain)
                 }
             }
             
-            // 第二行：归属人和支付方式
-            HStack(spacing: 8) {
-                if let owner = owners.first(where: { $0.id == bill.ownerId }) {
-                    CompactTagView(text: owner.name, color: .green)
-                }
-                
-                if let payment = paymentMethods.first(where: { $0.id == bill.paymentMethodId }) {
-                    CompactTagView(text: displayPaymentMethodName(payment.name), color: .blue)
-                }
-            }
-            
-            // 第三行：账单类型
+            // 第二行：所有标签（归属人、支付方式、账单类型）
             let categoryList = bill.categoryIds.compactMap { id in
                 categories.first(where: { $0.id == id })
             }
             
-            if !categoryList.isEmpty {
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 4) {
-                        ForEach(categoryList) { category in
-                            CompactTagView(text: category.name, color: .orange)
-                        }
-                    }
+            FlowLayout(spacing: 6) {
+                // 归属人标签
+                if let owner = owners.first(where: { $0.id == bill.ownerId }) {
+                    CompactTagView(text: owner.name, color: .green)
+                }
+                
+                // 支付方式标签
+                if let payment = paymentMethods.first(where: { $0.id == bill.paymentMethodId }) {
+                    CompactTagView(text: displayPaymentMethodName(payment.name), color: .blue)
+                }
+                
+                // 账单类型标签
+                ForEach(categoryList) { category in
+                    CompactTagView(text: category.name, color: .orange)
                 }
             }
             
             // 备注（如果有）
             if let note = bill.note, !note.isEmpty {
                 Text(note)
-                    .font(.system(size: 11))
+                    .font(.system(size: 13))
                     .foregroundColor(.secondary)
                     .lineLimit(2)
             }
         }
-        .padding(.vertical, 6)
+        .padding(.vertical, 8)
     }
     
     // 格式化日期时间为 yyyy-MM-dd HH:mm:ss
@@ -824,12 +782,12 @@ struct CompactTagView: View {
     
     var body: some View {
         Text(text)
-            .font(.system(size: 11))
-            .padding(.horizontal, 6)
-            .padding(.vertical, 2)
+            .font(.system(size: 13))
+            .padding(.horizontal, 8)
+            .padding(.vertical, 3)
             .background(color.opacity(0.15))
             .foregroundColor(color)
-            .cornerRadius(4)
+            .cornerRadius(6)
     }
 }
 
