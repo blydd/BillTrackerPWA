@@ -6,6 +6,7 @@ struct ChartStatisticsView: View {
     @ObservedObject var viewModel: StatisticsViewModel
     
     @State private var chartType: ChartType = .category
+    @State private var transactionTab: TransactionTypeTab = .expense
     @State private var startDate: Date?
     @State private var endDate: Date?
     @State private var showingFilterSheet = false
@@ -16,11 +17,17 @@ struct ChartStatisticsView: View {
         case paymentMethod = "按支付方式"
     }
     
+    enum TransactionTypeTab: String, CaseIterable {
+        case income = "收入"
+        case expense = "支出"
+        case excluded = "不计入"
+    }
+    
     var body: some View {
         NavigationView {
             ScrollView {
                 VStack(spacing: 20) {
-                    // 筛选条件选择
+                    // 统计维度选择
                     VStack(alignment: .leading, spacing: 12) {
                         Text("统计维度")
                             .font(.headline)
@@ -29,6 +36,21 @@ struct ChartStatisticsView: View {
                         Picker("", selection: $chartType) {
                             ForEach(ChartType.allCases, id: \.self) { type in
                                 Text(type.rawValue).tag(type)
+                            }
+                        }
+                        .pickerStyle(.segmented)
+                        .padding(.horizontal)
+                    }
+                    
+                    // 交易类型选择
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text("交易类型")
+                            .font(.headline)
+                            .padding(.horizontal)
+                        
+                        Picker("", selection: $transactionTab) {
+                            ForEach(TransactionTypeTab.allCases, id: \.self) { tab in
+                                Text(tab.rawValue).tag(tab)
                             }
                         }
                         .pickerStyle(.segmented)
@@ -119,10 +141,12 @@ struct ChartStatisticsView: View {
                 }
             }
             .sheet(isPresented: $showingFilterSheet) {
-                DateRangeFilterView(
+                ChartDateRangeFilterView(
                     startDate: $startDate,
                     endDate: $endDate
                 )
+                .presentationDetents([.medium])
+                .presentationDragIndicator(.hidden)
             }
         }
     }
@@ -131,14 +155,32 @@ struct ChartStatisticsView: View {
     private var chartData: [(String, Decimal, Color)] {
         let colors: [Color] = [.blue, .green, .orange, .red, .purple, .pink, .yellow, .cyan, .indigo, .mint]
         
-        let stats: [String: Decimal]
+        let allStats: [String: [TransactionType: Decimal]]
         switch chartType {
         case .owner:
-            stats = viewModel.ownerStatistics.mapValues { $0.values.reduce(0, +) }
+            allStats = viewModel.ownerStatistics
         case .category:
-            stats = viewModel.categoryStatistics.mapValues { $0.values.reduce(0, +) }
+            allStats = viewModel.categoryStatistics
         case .paymentMethod:
-            stats = viewModel.paymentMethodStatistics.mapValues { $0.values.reduce(0, +) }
+            allStats = viewModel.paymentMethodStatistics
+        }
+        
+        // 根据选择的交易类型筛选
+        var stats: [String: Decimal] = [:]
+        for (name, amounts) in allStats {
+            let value: Decimal
+            switch transactionTab {
+            case .income:
+                value = amounts[.income] ?? 0
+            case .expense:
+                value = amounts[.expense] ?? 0
+            case .excluded:
+                value = amounts[.excluded] ?? 0
+            }
+            
+            if value > 0 {
+                stats[name] = value
+            }
         }
         
         return stats
@@ -179,87 +221,189 @@ struct ChartStatisticsView: View {
     }
 }
 
-/// 日期范围筛选视图
-struct DateRangeFilterView: View {
+/// 图表日期范围筛选视图
+struct ChartDateRangeFilterView: View {
     @Environment(\.dismiss) private var dismiss
     
     @Binding var startDate: Date?
     @Binding var endDate: Date?
     
-    @State private var tempStartDate: Date = {
-        let calendar = Calendar.current
-        return calendar.startOfDay(for: Date())
-    }()
-    @State private var tempEndDate: Date = {
-        let calendar = Calendar.current
-        return calendar.date(bySettingHour: 23, minute: 59, second: 59, of: Date()) ?? Date()
-    }()
+    @State private var showingStartDatePicker = false
+    @State private var showingEndDatePicker = false
     
     var body: some View {
-        NavigationView {
-            Form {
-                Section("日期范围") {
-                    Toggle("开始日期", isOn: Binding(
-                        get: { startDate != nil },
-                        set: { enabled in
-                            if enabled {
-                                let calendar = Calendar.current
-                                startDate = calendar.startOfDay(for: tempStartDate)
-                            } else {
-                                startDate = nil
-                            }
+        VStack(spacing: 0) {
+            // 顶部拖拽指示器
+            RoundedRectangle(cornerRadius: 3)
+                .fill(Color.secondary.opacity(0.3))
+                .frame(width: 40, height: 5)
+                .padding(.top, 12)
+                .padding(.bottom, 8)
+            
+            // 标题栏
+            HStack {
+                Button("取消") {
+                    dismiss()
+                }
+                Spacer()
+                Text("日期筛选")
+                    .font(.headline)
+                Spacer()
+                Button("完成") {
+                    dismiss()
+                }
+            }
+            .padding(.horizontal)
+            .padding(.bottom, 12)
+            
+            Divider()
+            
+            VStack(spacing: 16) {
+                // 开始日期
+                Button(action: { showingStartDatePicker = true }) {
+                    HStack {
+                        Text("开始日期")
+                            .foregroundColor(.primary)
+                        Spacer()
+                        if let date = startDate {
+                            Text(formatDate(date))
+                                .foregroundColor(.blue)
+                        } else {
+                            Text("请选择")
+                                .foregroundColor(.secondary)
                         }
-                    ))
-                    
-                    if startDate != nil {
-                        DatePicker("", selection: Binding(
-                            get: { startDate ?? Date() },
-                            set: { newDate in
-                                let calendar = Calendar.current
-                                startDate = calendar.startOfDay(for: newDate)
-                                tempStartDate = newDate
-                            }
-                        ), displayedComponents: [.date])
-                        .datePickerStyle(.compact)
-                        .labelsHidden()
+                        Image(systemName: "chevron.right")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
                     }
-                    
-                    Toggle("结束日期", isOn: Binding(
-                        get: { endDate != nil },
-                        set: { enabled in
-                            if enabled {
-                                let calendar = Calendar.current
-                                endDate = calendar.date(bySettingHour: 23, minute: 59, second: 59, of: tempEndDate) ?? tempEndDate
-                            } else {
-                                endDate = nil
-                            }
+                    .padding()
+                    .background(Color(.systemGray6))
+                    .cornerRadius(12)
+                }
+                .buttonStyle(.plain)
+                
+                // 结束日期
+                Button(action: { showingEndDatePicker = true }) {
+                    HStack {
+                        Text("结束日期")
+                            .foregroundColor(.primary)
+                        Spacer()
+                        if let date = endDate {
+                            Text(formatDate(date))
+                                .foregroundColor(.blue)
+                        } else {
+                            Text("请选择")
+                                .foregroundColor(.secondary)
                         }
-                    ))
-                    
-                    if endDate != nil {
-                        DatePicker("", selection: Binding(
-                            get: { endDate ?? Date() },
-                            set: { newDate in
-                                let calendar = Calendar.current
-                                endDate = calendar.date(bySettingHour: 23, minute: 59, second: 59, of: newDate) ?? newDate
-                                tempEndDate = newDate
-                            }
-                        ), displayedComponents: [.date])
-                        .datePickerStyle(.compact)
-                        .labelsHidden()
+                        Image(systemName: "chevron.right")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                    .padding()
+                    .background(Color(.systemGray6))
+                    .cornerRadius(12)
+                }
+                .buttonStyle(.plain)
+                
+                // 清除日期按钮
+                if startDate != nil || endDate != nil {
+                    Button(action: {
+                        startDate = nil
+                        endDate = nil
+                    }) {
+                        HStack {
+                            Spacer()
+                            Text("清除日期范围")
+                                .font(.subheadline)
+                                .foregroundColor(.red)
+                            Spacer()
+                        }
+                        .padding(.vertical, 8)
                     }
                 }
             }
-            .navigationTitle("日期筛选")
+            .padding()
+            
+            Spacer()
+        }
+        .sheet(isPresented: $showingStartDatePicker) {
+            ChartDatePickerSheet(
+                title: "选择开始日期",
+                selectedDate: Binding(
+                    get: { startDate ?? Date() },
+                    set: { newDate in
+                        let calendar = Calendar.current
+                        startDate = calendar.startOfDay(for: newDate)
+                    }
+                )
+            )
+        }
+        .sheet(isPresented: $showingEndDatePicker) {
+            ChartDatePickerSheet(
+                title: "选择结束日期",
+                selectedDate: Binding(
+                    get: { endDate ?? Date() },
+                    set: { newDate in
+                        let calendar = Calendar.current
+                        endDate = calendar.date(bySettingHour: 23, minute: 59, second: 59, of: newDate) ?? newDate
+                    }
+                )
+            )
+        }
+    }
+    
+    private func formatDate(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd"
+        return formatter.string(from: date)
+    }
+}
+
+/// 图表日期选择器弹窗
+struct ChartDatePickerSheet: View {
+    @Environment(\.dismiss) private var dismiss
+    let title: String
+    @Binding var selectedDate: Date
+    
+    @State private var initialDate: Date
+    
+    init(title: String, selectedDate: Binding<Date>) {
+        self.title = title
+        self._selectedDate = selectedDate
+        self._initialDate = State(initialValue: selectedDate.wrappedValue)
+    }
+    
+    var body: some View {
+        NavigationView {
+            VStack {
+                DatePicker(
+                    "",
+                    selection: $selectedDate,
+                    displayedComponents: [.date]
+                )
+                .datePickerStyle(.graphical)
+                .padding()
+                .onChange(of: selectedDate) { oldValue, newValue in
+                    // 只有当日期真正改变时才关闭
+                    let calendar = Calendar.current
+                    let oldDay = calendar.startOfDay(for: oldValue)
+                    let newDay = calendar.startOfDay(for: newValue)
+                    
+                    if oldDay != newDay {
+                        // 延迟一点关闭，让用户看到选中效果
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                            dismiss()
+                        }
+                    }
+                }
+                
+                Spacer()
+            }
+            .navigationTitle(title)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("取消") {
-                        dismiss()
-                    }
-                }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("完成") {
                         dismiss()
                     }
                 }
