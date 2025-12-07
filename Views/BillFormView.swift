@@ -67,6 +67,14 @@ struct BillFormView: View {
                             TextField("金额", text: $amount)
                                 .keyboardType(selectedTransactionType == .excluded ? .numbersAndPunctuation : .decimalPad)
                                 .focused($isAmountFocused)
+                                .toolbar {
+                                    ToolbarItemGroup(placement: .keyboard) {
+                                        Spacer()
+                                        Button("完成") {
+                                            isAmountFocused = false
+                                        }
+                                    }
+                                }
                             
                             if selectedTransactionType == .excluded {
                                 Text("(可输入负数)")

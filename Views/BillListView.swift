@@ -68,60 +68,58 @@ struct BillListView: View {
                     }
                     
                     if isFilterExpanded {
-                        ScrollView(.horizontal, showsIndicators: false) {
-                            HStack(spacing: 8) {
-                                // 归属人筛选标签
-                                ForEach(Array(selectedOwnerIds), id: \.self) { ownerId in
-                                    if let owner = ownerViewModel.owners.first(where: { $0.id == ownerId }) {
-                                        FilterTagView(text: owner.name, color: .green) {
-                                            selectedOwnerIds.remove(ownerId)
-                                            selectedPaymentMethodIds.removeAll()
-                                        }
+                        FlowLayout(spacing: 8) {
+                            // 归属人筛选标签
+                            ForEach(Array(selectedOwnerIds), id: \.self) { ownerId in
+                                if let owner = ownerViewModel.owners.first(where: { $0.id == ownerId }) {
+                                    FilterTagView(text: owner.name, color: .green) {
+                                        selectedOwnerIds.remove(ownerId)
+                                        selectedPaymentMethodIds.removeAll()
                                     }
-                                }
-                                
-                                // 账单类型筛选标签
-                                ForEach(Array(selectedCategoryIds), id: \.self) { categoryId in
-                                    if let category = categoryViewModel.categories.first(where: { $0.id == categoryId }) {
-                                        FilterTagView(text: category.name, color: .orange) {
-                                            selectedCategoryIds.remove(categoryId)
-                                        }
-                                    }
-                                }
-                                
-                                // 支付方式筛选标签
-                                ForEach(Array(selectedPaymentMethodIds), id: \.self) { methodId in
-                                    if let method = paymentViewModel.paymentMethods.first(where: { $0.id == methodId }) {
-                                        FilterTagView(text: displayPaymentMethodName(method.name), color: .blue) {
-                                            selectedPaymentMethodIds.remove(methodId)
-                                        }
-                                    }
-                                }
-                                
-                                // 日期范围标签
-                                if startDate != nil || endDate != nil {
-                                    FilterTagView(text: dateRangeText, color: .purple) {
-                                        startDate = nil
-                                        endDate = nil
-                                    }
-                                }
-                                
-                                // 清空所有筛选
-                                Button(action: clearAllFilters) {
-                                    HStack(spacing: 4) {
-                                        Image(systemName: "xmark.circle.fill")
-                                        Text("清空")
-                                    }
-                                    .font(.caption)
-                                    .padding(.horizontal, 12)
-                                    .padding(.vertical, 6)
-                                    .background(Color.red.opacity(0.2))
-                                    .foregroundColor(.red)
-                                    .cornerRadius(16)
                                 }
                             }
-                            .padding(.horizontal)
+                            
+                            // 账单类型筛选标签
+                            ForEach(Array(selectedCategoryIds), id: \.self) { categoryId in
+                                if let category = categoryViewModel.categories.first(where: { $0.id == categoryId }) {
+                                    FilterTagView(text: category.name, color: .orange) {
+                                        selectedCategoryIds.remove(categoryId)
+                                    }
+                                }
+                            }
+                            
+                            // 支付方式筛选标签
+                            ForEach(Array(selectedPaymentMethodIds), id: \.self) { methodId in
+                                if let method = paymentViewModel.paymentMethods.first(where: { $0.id == methodId }) {
+                                    FilterTagView(text: displayPaymentMethodName(method.name), color: .blue) {
+                                        selectedPaymentMethodIds.remove(methodId)
+                                    }
+                                }
+                            }
+                            
+                            // 日期范围标签
+                            if startDate != nil || endDate != nil {
+                                FilterTagView(text: dateRangeText, color: .purple) {
+                                    startDate = nil
+                                    endDate = nil
+                                }
+                            }
+                            
+                            // 清空所有筛选
+                            Button(action: clearAllFilters) {
+                                HStack(spacing: 4) {
+                                    Image(systemName: "xmark.circle.fill")
+                                    Text("清空")
+                                }
+                                .font(.caption)
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 6)
+                                .background(Color.red.opacity(0.2))
+                                .foregroundColor(.red)
+                                .cornerRadius(16)
+                            }
                         }
+                        .padding(.horizontal)
                         .padding(.bottom, 8)
                         .transition(.opacity.combined(with: .move(edge: .top)))
                     }
@@ -292,6 +290,8 @@ struct BillListView: View {
                 startDate: $startDate,
                 endDate: $endDate
             )
+            .presentationDetents([.medium, .large])
+            .presentationDragIndicator(.hidden)
         }
         .task {
             await loadData()
@@ -872,18 +872,36 @@ struct FilterSheetView: View {
     @Binding var startDate: Date?
     @Binding var endDate: Date?
     
-    @State private var tempStartDate: Date = {
-        let calendar = Calendar.current
-        return calendar.startOfDay(for: Date())
-    }()
-    @State private var tempEndDate: Date = {
-        let calendar = Calendar.current
-        let endOfDay = calendar.date(bySettingHour: 23, minute: 59, second: 59, of: Date()) ?? Date()
-        return endOfDay
-    }()
+    @State private var showingStartDatePicker = false
+    @State private var showingEndDatePicker = false
     
     var body: some View {
-        NavigationView {
+        VStack(spacing: 0) {
+            // 顶部拖拽指示器
+            RoundedRectangle(cornerRadius: 3)
+                .fill(Color.secondary.opacity(0.3))
+                .frame(width: 40, height: 5)
+                .padding(.top, 12)
+                .padding(.bottom, 8)
+            
+            // 标题栏
+            HStack {
+                Button("取消") {
+                    dismiss()
+                }
+                Spacer()
+                Text("筛选条件")
+                    .font(.headline)
+                Spacer()
+                Button("完成") {
+                    dismiss()
+                }
+            }
+            .padding(.horizontal)
+            .padding(.bottom, 12)
+            
+            Divider()
+            
             ScrollView {
                 VStack(alignment: .leading, spacing: 20) {
                     // 归属人筛选
@@ -976,80 +994,67 @@ struct FilterSheetView: View {
                         
                         VStack(spacing: 12) {
                             // 开始日期
-                            VStack(alignment: .leading, spacing: 8) {
+                            Button(action: { showingStartDatePicker = true }) {
                                 HStack {
                                     Text("开始日期")
-                                        .font(.subheadline)
-                                        .foregroundColor(.secondary)
+                                        .foregroundColor(.primary)
                                     Spacer()
-                                    Toggle("", isOn: Binding(
-                                        get: { startDate != nil },
-                                        set: { enabled in
-                                            if enabled {
-                                                let calendar = Calendar.current
-                                                startDate = calendar.startOfDay(for: tempStartDate)
-                                            } else {
-                                                startDate = nil
-                                            }
-                                        }
-                                    ))
-                                    .labelsHidden()
+                                    if let date = startDate {
+                                        Text(formatDate(date))
+                                            .foregroundColor(.blue)
+                                    } else {
+                                        Text("请选择")
+                                            .foregroundColor(.secondary)
+                                    }
+                                    Image(systemName: "chevron.right")
+                                        .font(.caption)
+                                        .foregroundColor(.secondary)
                                 }
-                                
-                                if startDate != nil {
-                                    DatePicker("", selection: Binding(
-                                        get: { startDate ?? Date() },
-                                        set: { newDate in
-                                            let calendar = Calendar.current
-                                            startDate = calendar.startOfDay(for: newDate)
-                                            tempStartDate = newDate
-                                        }
-                                    ), displayedComponents: [.date])
-                                    .datePickerStyle(.compact)
-                                    .labelsHidden()
-                                }
+                                .padding()
+                                .background(Color(.systemGray6))
+                                .cornerRadius(12)
                             }
-                            .padding()
-                            .background(Color(.systemGray6))
-                            .cornerRadius(12)
+                            .buttonStyle(.plain)
                             
                             // 结束日期
-                            VStack(alignment: .leading, spacing: 8) {
+                            Button(action: { showingEndDatePicker = true }) {
                                 HStack {
                                     Text("结束日期")
-                                        .font(.subheadline)
-                                        .foregroundColor(.secondary)
+                                        .foregroundColor(.primary)
                                     Spacer()
-                                    Toggle("", isOn: Binding(
-                                        get: { endDate != nil },
-                                        set: { enabled in
-                                            if enabled {
-                                                let calendar = Calendar.current
-                                                endDate = calendar.date(bySettingHour: 23, minute: 59, second: 59, of: tempEndDate) ?? tempEndDate
-                                            } else {
-                                                endDate = nil
-                                            }
-                                        }
-                                    ))
-                                    .labelsHidden()
+                                    if let date = endDate {
+                                        Text(formatDate(date))
+                                            .foregroundColor(.blue)
+                                    } else {
+                                        Text("请选择")
+                                            .foregroundColor(.secondary)
+                                    }
+                                    Image(systemName: "chevron.right")
+                                        .font(.caption)
+                                        .foregroundColor(.secondary)
                                 }
-                                
-                                if endDate != nil {
-                                    DatePicker("", selection: Binding(
-                                        get: { endDate ?? Date() },
-                                        set: { newDate in
-                                            let calendar = Calendar.current
-                                            endDate = calendar.date(bySettingHour: 23, minute: 59, second: 59, of: newDate) ?? newDate
-                                            tempEndDate = newDate
-                                        }
-                                    ), displayedComponents: [.date])
-                                    .datePickerStyle(.compact)
-                                    .labelsHidden()
+                                .padding()
+                                .background(Color(.systemGray6))
+                                .cornerRadius(12)
+                            }
+                            .buttonStyle(.plain)
+                            
+                            // 清除日期按钮
+                            if startDate != nil || endDate != nil {
+                                Button(action: {
+                                    startDate = nil
+                                    endDate = nil
+                                }) {
+                                    HStack {
+                                        Spacer()
+                                        Text("清除日期范围")
+                                            .font(.subheadline)
+                                            .foregroundColor(.red)
+                                        Spacer()
+                                    }
+                                    .padding(.vertical, 8)
                                 }
                             }
-                            .padding()
-                            .background(Color(.systemGray6))
-                            .cornerRadius(12)
                         }
                         .padding(.horizontal)
                     }
@@ -1058,20 +1063,30 @@ struct FilterSheetView: View {
                 }
                 .padding(.vertical)
             }
-            .navigationTitle("筛选条件")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("取消") {
-                        dismiss()
+        }
+        .sheet(isPresented: $showingStartDatePicker) {
+            DatePickerSheet(
+                title: "选择开始日期",
+                selectedDate: Binding(
+                    get: { startDate ?? Date() },
+                    set: { newDate in
+                        let calendar = Calendar.current
+                        startDate = calendar.startOfDay(for: newDate)
                     }
-                }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("完成") {
-                        dismiss()
+                )
+            )
+        }
+        .sheet(isPresented: $showingEndDatePicker) {
+            DatePickerSheet(
+                title: "选择结束日期",
+                selectedDate: Binding(
+                    get: { endDate ?? Date() },
+                    set: { newDate in
+                        let calendar = Calendar.current
+                        endDate = calendar.date(bySettingHour: 23, minute: 59, second: 59, of: newDate) ?? newDate
                     }
-                }
-            }
+                )
+            )
         }
     }
     
@@ -1089,5 +1104,64 @@ struct FilterSheetView: View {
             return String(name[startIndex...])
         }
         return name
+    }
+    
+    private func formatDate(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd"
+        return formatter.string(from: date)
+    }
+}
+
+/// 日期选择器弹窗
+struct DatePickerSheet: View {
+    @Environment(\.dismiss) private var dismiss
+    let title: String
+    @Binding var selectedDate: Date
+    
+    @State private var initialDate: Date
+    
+    init(title: String, selectedDate: Binding<Date>) {
+        self.title = title
+        self._selectedDate = selectedDate
+        self._initialDate = State(initialValue: selectedDate.wrappedValue)
+    }
+    
+    var body: some View {
+        NavigationView {
+            VStack {
+                DatePicker(
+                    "",
+                    selection: $selectedDate,
+                    displayedComponents: [.date]
+                )
+                .datePickerStyle(.graphical)
+                .padding()
+                .onChange(of: selectedDate) { oldValue, newValue in
+                    // 只有当日期真正改变时才关闭（排除初始化时的触发）
+                    let calendar = Calendar.current
+                    let oldDay = calendar.startOfDay(for: oldValue)
+                    let newDay = calendar.startOfDay(for: newValue)
+                    
+                    if oldDay != newDay {
+                        // 延迟一点关闭，让用户看到选中效果
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                            dismiss()
+                        }
+                    }
+                }
+                
+                Spacer()
+            }
+            .navigationTitle(title)
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("取消") {
+                        dismiss()
+                    }
+                }
+            }
+        }
     }
 }
