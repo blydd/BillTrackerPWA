@@ -131,25 +131,20 @@ struct ChartStatisticsView: View {
     private var chartData: [(String, Decimal, Color)] {
         let colors: [Color] = [.blue, .green, .orange, .red, .purple, .pink, .yellow, .cyan, .indigo, .mint]
         
+        let stats: [String: Decimal]
         switch chartType {
         case .owner:
-            return viewModel.ownerStatistics
-                .sorted { $0.value > $1.value }
-                .enumerated()
-                .map { ($0.element.key, $0.element.value, colors[$0.offset % colors.count]) }
-            
+            stats = viewModel.ownerStatistics.mapValues { $0.values.reduce(0, +) }
         case .category:
-            return viewModel.categoryStatistics
-                .sorted { $0.value > $1.value }
-                .enumerated()
-                .map { ($0.element.key, $0.element.value, colors[$0.offset % colors.count]) }
-            
+            stats = viewModel.categoryStatistics.mapValues { $0.values.reduce(0, +) }
         case .paymentMethod:
-            return viewModel.paymentMethodStatistics
-                .sorted { $0.value > $1.value }
-                .enumerated()
-                .map { ($0.element.key, $0.element.value, colors[$0.offset % colors.count]) }
+            stats = viewModel.paymentMethodStatistics.mapValues { $0.values.reduce(0, +) }
         }
+        
+        return stats
+            .sorted { $0.value > $1.value }
+            .enumerated()
+            .map { ($0.element.key, $0.element.value, colors[$0.offset % colors.count]) }
     }
     
     private var chartTotal: Decimal {

@@ -7,9 +7,9 @@ import Combine
 class StatisticsViewModel: ObservableObject {
     @Published var totalIncome: Decimal = 0
     @Published var totalExpense: Decimal = 0
-    @Published var categoryStatistics: [String: Decimal] = [:]
-    @Published var ownerStatistics: [String: Decimal] = [:]
-    @Published var paymentMethodStatistics: [String: Decimal] = [:]
+    @Published var categoryStatistics: [String: [TransactionType: Decimal]] = [:]
+    @Published var ownerStatistics: [String: [TransactionType: Decimal]] = [:]
+    @Published var paymentMethodStatistics: [String: [TransactionType: Decimal]] = [:]
     @Published var errorMessage: String?
     @Published var isLoading: Bool = false
     
@@ -52,9 +52,9 @@ class StatisticsViewModel: ObservableObject {
             // 重置统计数据
             var income: Decimal = 0
             var expense: Decimal = 0
-            var catStats: [String: Decimal] = [:]
-            var ownStats: [String: Decimal] = [:]
-            var pmStats: [String: Decimal] = [:]
+            var catStats: [String: [TransactionType: Decimal]] = [:]
+            var ownStats: [String: [TransactionType: Decimal]] = [:]
+            var pmStats: [String: [TransactionType: Decimal]] = [:]
             
             // 遍历账单计算统计
             for bill in bills {
@@ -62,40 +62,51 @@ class StatisticsViewModel: ObservableObject {
                     continue
                 }
                 
+                // 获取账单的交易类型
+                let transactionType = paymentMethod.transactionType
+                let amount = abs(bill.amount)
+                
                 // 检查账单类型是否为"不计入"
                 let billCategories = bill.categoryIds.compactMap { categoryId in
                     categories.first(where: { $0.id == categoryId })
                 }
                 
-                // 如果账单的所有类型都是不计入，则排除 (Requirement 8.5)
+                // 如果账单的所有类型都是不计入，则在总览中排除 (Requirement 8.5)
                 let isExcluded = !billCategories.isEmpty && billCategories.allSatisfy { $0.transactionType == .excluded }
                 
-                guard !isExcluded else {
-                    continue
-                }
-                
-                // 计算总收入和总支出
-                // 账单金额：正数表示收入，负数表示支出
-                if bill.amount > 0 {
-                    income += bill.amount
-                } else if bill.amount < 0 {
-                    expense += abs(bill.amount)
+                if !isExcluded {
+                    // 计算总收入和总支出
+                    // 账单金额：正数表示收入，负数表示支出
+                    if bill.amount > 0 {
+                        income += bill.amount
+                    } else if bill.amount < 0 {
+                        expense += abs(bill.amount)
+                    }
                 }
                 
                 // 按账单类型统计 (Requirement 8.2)
                 for categoryId in bill.categoryIds {
                     if let categoryName = categoryDict[categoryId] {
-                        catStats[categoryName, default: 0] += abs(bill.amount)
+                        if catStats[categoryName] == nil {
+                            catStats[categoryName] = [:]
+                        }
+                        catStats[categoryName]?[transactionType, default: 0] += amount
                     }
                 }
                 
                 // 按归属人统计 (Requirement 8.3)
                 if let ownerName = ownerDict[bill.ownerId] {
-                    ownStats[ownerName, default: 0] += abs(bill.amount)
+                    if ownStats[ownerName] == nil {
+                        ownStats[ownerName] = [:]
+                    }
+                    ownStats[ownerName]?[transactionType, default: 0] += amount
                 }
                 
                 // 按支付方式统计 (Requirement 8.4)
-                pmStats[paymentMethod.name, default: 0] += abs(bill.amount)
+                if pmStats[paymentMethod.name] == nil {
+                    pmStats[paymentMethod.name] = [:]
+                }
+                pmStats[paymentMethod.name]?[transactionType, default: 0] += amount
             }
             
             // 更新发布的属性
