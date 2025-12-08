@@ -62,7 +62,7 @@ class CloudKitSyncManager: ObservableObject {
         record["createdAt"] = owner.createdAt as CKRecordValue
         record["updatedAt"] = owner.updatedAt as CKRecordValue
         
-        try await privateDatabase.save(record)
+        _ = try await privateDatabase.save(record)
     }
     
     func uploadCategory(_ category: BillCategory) async throws {
@@ -72,7 +72,7 @@ class CloudKitSyncManager: ObservableObject {
         record["createdAt"] = category.createdAt as CKRecordValue
         record["updatedAt"] = category.updatedAt as CKRecordValue
         
-        try await privateDatabase.save(record)
+        _ = try await privateDatabase.save(record)
     }
     
     func uploadPaymentMethod(_ method: PaymentMethodWrapper) async throws {
@@ -84,7 +84,7 @@ class CloudKitSyncManager: ObservableObject {
         record["createdAt"] = method.createdAt as CKRecordValue
         record["updatedAt"] = method.updatedAt as CKRecordValue
         
-        try await privateDatabase.save(record)
+        _ = try await privateDatabase.save(record)
     }
     
     func uploadBill(_ bill: Bill) async throws {
@@ -97,7 +97,7 @@ class CloudKitSyncManager: ObservableObject {
         record["createdAt"] = bill.createdAt as CKRecordValue
         record["updatedAt"] = bill.updatedAt as CKRecordValue
         
-        try await privateDatabase.save(record)
+        _ = try await privateDatabase.save(record)
     }
     
     // MARK: - 从 CloudKit 下载数据
