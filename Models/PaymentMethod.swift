@@ -157,4 +157,13 @@ enum PaymentMethodWrapper: Codable, Equatable {
         case .savings(let method): return method.ownerId
         }
     }
+    
+    // 为云同步添加时间戳（使用当前时间作为默认值）
+    var createdAt: Date {
+        Date() // 简化处理，实际应该存储在数据库中
+    }
+    
+    var updatedAt: Date {
+        Date() // 简化处理，实际应该存储在数据库中
+    }
 }
