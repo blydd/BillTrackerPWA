@@ -104,10 +104,10 @@ class CloudKitSyncManager: ObservableObject {
     
     func fetchOwners() async throws -> [Owner] {
         let query = CKQuery(recordType: ownerRecordType, predicate: NSPredicate(value: true))
-        let results = try await privateDatabase.records(matching: query)
+        let (matchResults, _) = try await privateDatabase.records(matching: query)
         
         var owners: [Owner] = []
-        for (_, result) in results.matchResults {
+        for (_, result) in matchResults {
             if let record = try? result.get() {
                 if let owner = parseOwner(from: record) {
                     owners.append(owner)
@@ -119,10 +119,10 @@ class CloudKitSyncManager: ObservableObject {
     
     func fetchCategories() async throws -> [BillCategory] {
         let query = CKQuery(recordType: categoryRecordType, predicate: NSPredicate(value: true))
-        let results = try await privateDatabase.records(matching: query)
+        let (matchResults, _) = try await privateDatabase.records(matching: query)
         
         var categories: [BillCategory] = []
-        for (_, result) in results.matchResults {
+        for (_, result) in matchResults {
             if let record = try? result.get() {
                 if let category = parseCategory(from: record) {
                     categories.append(category)
@@ -134,10 +134,10 @@ class CloudKitSyncManager: ObservableObject {
     
     func fetchPaymentMethods() async throws -> [PaymentMethodWrapper] {
         let query = CKQuery(recordType: paymentMethodRecordType, predicate: NSPredicate(value: true))
-        let results = try await privateDatabase.records(matching: query)
+        let (matchResults, _) = try await privateDatabase.records(matching: query)
         
         var methods: [PaymentMethodWrapper] = []
-        for (_, result) in results.matchResults {
+        for (_, result) in matchResults {
             if let record = try? result.get() {
                 if let method = parsePaymentMethod(from: record) {
                     methods.append(method)
@@ -149,10 +149,10 @@ class CloudKitSyncManager: ObservableObject {
     
     func fetchBills() async throws -> [Bill] {
         let query = CKQuery(recordType: billRecordType, predicate: NSPredicate(value: true))
-        let results = try await privateDatabase.records(matching: query)
+        let (matchResults, _) = try await privateDatabase.records(matching: query)
         
         var bills: [Bill] = []
-        for (_, result) in results.matchResults {
+        for (_, result) in matchResults {
             if let record = try? result.get() {
                 if let bill = parseBill(from: record) {
                     bills.append(bill)

@@ -240,9 +240,9 @@ class AutoSyncManager: ObservableObject {
         // 下载 Owners
         let ownerPredicate = NSPredicate(format: "modificationDate > %@", lastSync as NSDate)
         let ownerQuery = CKQuery(recordType: ownerRecordType, predicate: ownerPredicate)
-        let ownerResults = try await privateDatabase.records(matching: ownerQuery)
+        let (ownerResults, _) = try await privateDatabase.records(matching: ownerQuery)
         
-        for (_, result) in ownerResults.matchResults {
+        for (_, result) in ownerResults {
             if let record = try? result.get(),
                let owner = parseOwner(from: record) {
                 // 保存到本地数据库（需要添加 upsert 方法）
