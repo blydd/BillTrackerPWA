@@ -3,21 +3,25 @@ import SwiftUI
 @main
 struct ExpenseTrackerApp: App {
     private let repository: DataRepository
-    @StateObject private var autoSyncManager: AutoSyncManager
+    @StateObject private var autoSyncManager: AutoSyncManager?
     
     init() {
         // 初始化 SQLite 数据仓库
         let repo = Self.setupRepository()
         self.repository = repo
         
-        // 初始化自动同步管理器
+        // 初始化自动同步管理器（仅在真机上）
+        #if targetEnvironment(simulator)
+        _autoSyncManager = StateObject(wrappedValue: nil)
+        #else
         _autoSyncManager = StateObject(wrappedValue: AutoSyncManager(repository: repo))
+        #endif
     }
     
     var body: some Scene {
         WindowGroup {
             ContentView(repository: repository)
-                .environmentObject(autoSyncManager)
+                .modifier(SyncManagerModifier(syncManager: autoSyncManager))
         }
     }
     
@@ -67,52 +71,57 @@ struct ContentView: View {
 
 struct SettingsView: View {
     let repository: DataRepository
-    @EnvironmentObject var autoSyncManager: AutoSyncManager
+    @EnvironmentObject var autoSyncManager: AutoSyncManager?
     
     var body: some View {
         List {
-            // 云同步状态
-            Section {
-                HStack {
-                    Image(systemName: "icloud.fill")
-                        .foregroundColor(autoSyncManager.isSyncing ? .blue : .gray)
-                    Text("iCloud 同步")
-                    Spacer()
-                    if autoSyncManager.isSyncing {
-                        ProgressView()
-                    } else if let lastSync = autoSyncManager.lastSyncDate {
-                        Text(timeAgo(lastSync))
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                    } else {
-                        Text("未同步")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                    }
-                }
-                
-                if let error = autoSyncManager.syncError {
+            // 云同步状态（仅在真机上显示）
+            if let syncManager = autoSyncManager {
+                Section {
                     HStack {
-                        Image(systemName: "exclamationmark.triangle.fill")
-                            .foregroundColor(.orange)
-                        Text(error)
-                            .font(.caption)
-                            .foregroundColor(.secondary)
+                        Image(systemName: "icloud.fill")
+                            .foregroundColor(syncManager.isSyncing ? .blue : .gray)
+                        Text("iCloud 同步")
+                        Spacer()
+                        if syncManager.isSyncing {
+                            ProgressView()
+                        } else if let lastSync = syncManager.lastSyncDate {
+                            Text(timeAgo(lastSync))
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        } else {
+                            Text("未同步")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                    }
+                    
+                    if let error = syncManager.syncError {
+                        HStack {
+                            Image(systemName: "exclamationmark.triangle.fill")
+                                .foregroundColor(.orange)
+                            Text(error)
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
                     }
                 }
             }
             
-            Section("云服务") {
-                NavigationLink {
-                    CloudSyncSettingsView()
-                } label: {
-                    HStack {
-                        Image(systemName: "icloud.fill")
-                            .foregroundColor(.blue)
-                        Text("云同步设置")
-                        Spacer()
-                        if autoSyncManager.isSyncing {
-                            ProgressView()
+            // 云服务（仅在真机上显示）
+            if let syncManager = autoSyncManager {
+                Section("云服务") {
+                    NavigationLink {
+                        CloudSyncSettingsView()
+                    } label: {
+                        HStack {
+                            Image(systemName: "icloud.fill")
+                                .foregroundColor(.blue)
+                            Text("云同步设置")
+                            Spacer()
+                            if syncManager.isSyncing {
+                                ProgressView()
+                            }
                         }
                     }
                 }
@@ -173,6 +182,20 @@ struct SettingsView: View {
         } else {
             let days = Int(interval / 86400)
             return "\(days)天前"
+        }
+    }
+}
+
+// MARK: - Sync Manager Modifier
+
+struct SyncManagerModifier: ViewModifier {
+    let syncManager: AutoSyncManager?
+    
+    func body(content: Content) -> some View {
+        if let syncManager = syncManager {
+            content.environmentObject(syncManager)
+        } else {
+            content
         }
     }
 }
