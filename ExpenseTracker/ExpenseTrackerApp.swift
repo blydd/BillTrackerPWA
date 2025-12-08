@@ -11,8 +11,13 @@ struct ExpenseTrackerApp: App {
     
     var body: some Scene {
         WindowGroup {
-            // 暂时禁用云同步，先让应用能运行
+            #if targetEnvironment(simulator)
+            // 模拟器：不使用云同步
             ContentView(repository: repository)
+            #else
+            // 真机：使用云同步
+            ContentViewWithSync(repository: repository)
+            #endif
         }
     }
     
@@ -65,7 +70,10 @@ struct SettingsView: View {
     
     var body: some View {
         List {
-            // 云同步功能暂时禁用
+            #if !targetEnvironment(simulator)
+            // 云同步状态（仅在真机上显示）
+            CloudSyncSection()
+            #endif
             
             Section("数据管理") {
                 NavigationLink("账单类型管理") {
