@@ -103,7 +103,7 @@ class AutoSyncManager: ObservableObject {
     }
     
     deinit {
-        stopAutoSync()
+        syncTimer?.invalidate()
         NotificationCenter.default.removeObserver(self)
     }
     
@@ -318,7 +318,7 @@ class AutoSyncManager: ObservableObject {
             try await localRepository.updateOwner(owner)
         } else {
             // 插入
-            try await localRepository.addOwner(owner)
+            try await localRepository.saveOwner(owner)
         }
     }
     

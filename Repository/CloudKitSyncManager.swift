@@ -222,7 +222,7 @@ class CloudKitSyncManager: ObservableObject {
         let categoryIds = categoryIdStrings.compactMap { UUID(uuidString: $0) }
         let note = record["note"] as? String
         
-        return Bill(id: id, amount: amount, ownerId: ownerId, paymentMethodId: paymentMethodId, categoryIds: categoryIds, note: note, createdAt: createdAt, updatedAt: updatedAt)
+        return Bill(id: id, amount: amount, paymentMethodId: paymentMethodId, categoryIds: categoryIds, ownerId: ownerId, note: note, createdAt: createdAt, updatedAt: updatedAt)
     }
     
     // MARK: - 完整同步
