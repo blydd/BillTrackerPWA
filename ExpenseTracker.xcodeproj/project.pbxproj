@@ -7,6 +7,10 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		8DBA37902EE6BA76007FBEA5 /* AutoSyncManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8DBA378D2EE6BA76007FBEA5 /* AutoSyncManager.swift */; };
+		8DBA37912EE6BA76007FBEA5 /* CloudKitRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8DBA378E2EE6BA76007FBEA5 /* CloudKitRepository.swift */; };
+		8DBA37922EE6BA76007FBEA5 /* CloudKitSyncManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8DBA378F2EE6BA76007FBEA5 /* CloudKitSyncManager.swift */; };
+		8DBA37942EE6BA8B007FBEA5 /* CloudSyncSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8DBA37932EE6BA8B007FBEA5 /* CloudSyncSettingsView.swift */; };
 		8DC61B4E2ED985360043BB28 /* AppError.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8DC61B2F2ED985360043BB28 /* AppError.swift */; };
 		8DC61B4F2ED985360043BB28 /* ErrorHandlingExampleView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8DC61B472ED985360043BB28 /* ErrorHandlingExampleView.swift */; };
 		8DC61B502ED985360043BB28 /* Bill.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8DC61B302ED985360043BB28 /* Bill.swift */; };
@@ -42,10 +46,13 @@
 		8DC61B792EE0231B0043BB28 /* DatabaseManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8DC61B772EE0231B0043BB28 /* DatabaseManager.swift */; };
 		8DC61B7A2EE0231B0043BB28 /* SQLiteRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8DC61B782EE0231B0043BB28 /* SQLiteRepository.swift */; };
 		8DC61B7C2EE023330043BB28 /* DatabaseInfoView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8DC61B7B2EE023330043BB28 /* DatabaseInfoView.swift */; };
-
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		8DBA378D2EE6BA76007FBEA5 /* AutoSyncManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AutoSyncManager.swift; sourceTree = "<group>"; };
+		8DBA378E2EE6BA76007FBEA5 /* CloudKitRepository.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CloudKitRepository.swift; sourceTree = "<group>"; };
+		8DBA378F2EE6BA76007FBEA5 /* CloudKitSyncManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CloudKitSyncManager.swift; sourceTree = "<group>"; };
+		8DBA37932EE6BA8B007FBEA5 /* CloudSyncSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CloudSyncSettingsView.swift; sourceTree = "<group>"; };
 		8DC61B1F2ED984D20043BB28 /* ExpenseTracker.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = ExpenseTracker.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		8DC61B2E2ED985360043BB28 /* AccountType.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AccountType.swift; sourceTree = "<group>"; };
 		8DC61B2F2ED985360043BB28 /* AppError.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppError.swift; sourceTree = "<group>"; };
@@ -83,7 +90,6 @@
 		8DC61B782EE0231B0043BB28 /* SQLiteRepository.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SQLiteRepository.swift; sourceTree = "<group>"; };
 		8DC61B7B2EE023330043BB28 /* DatabaseInfoView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DatabaseInfoView.swift; sourceTree = "<group>"; };
 		8DC61B832EE661450043BB28 /* Untitled.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Untitled.swift; sourceTree = "<group>"; };
-
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -142,9 +148,9 @@
 		8DC61B382ED985360043BB28 /* Repository */ = {
 			isa = PBXGroup;
 			children = (
-				8DC61B8A2EE68BA90043BB28 /* AutoSyncManager.swift */,
-				8DC61B8B2EE68BA90043BB28 /* CloudKitRepository.swift */,
-				8DC61B8C2EE68BA90043BB28 /* CloudKitSyncManager.swift */,
+				8DBA378D2EE6BA76007FBEA5 /* AutoSyncManager.swift */,
+				8DBA378E2EE6BA76007FBEA5 /* CloudKitRepository.swift */,
+				8DBA378F2EE6BA76007FBEA5 /* CloudKitSyncManager.swift */,
 				8DC61B832EE661450043BB28 /* Untitled.swift */,
 				8DC61B772EE0231B0043BB28 /* DatabaseManager.swift */,
 				8DC61B782EE0231B0043BB28 /* SQLiteRepository.swift */,
@@ -171,7 +177,7 @@
 		8DC61B4D2ED985360043BB28 /* Views */ = {
 			isa = PBXGroup;
 			children = (
-				8DC61B902EE68BC00043BB28 /* CloudSyncSettingsView.swift */,
+				8DBA37932EE6BA8B007FBEA5 /* CloudSyncSettingsView.swift */,
 				8DC61B7B2EE023330043BB28 /* DatabaseInfoView.swift */,
 				8DC61B752EE004D90043BB28 /* PieChartView.swift */,
 				8DC61B732EE004CB0043BB28 /* ChartStatisticsView.swift */,
@@ -281,9 +287,6 @@
 				8DC61B582ED985360043BB28 /* Owner.swift in Sources */,
 				8DC61B592ED985360043BB28 /* CategoryManagementView.swift in Sources */,
 				8DC61B5A2ED985360043BB28 /* PaymentMethodListView.swift in Sources */,
-				8DC61B8D2EE68BA90043BB28 /* CloudKitRepository.swift in Sources */,
-				8DC61B8E2EE68BA90043BB28 /* CloudKitSyncManager.swift in Sources */,
-				8DC61B8F2EE68BA90043BB28 /* AutoSyncManager.swift in Sources */,
 				8DC61B5B2ED985360043BB28 /* DeleteConfirmationModifier.swift in Sources */,
 				8DC61B5C2ED985360043BB28 /* CategoryViewModel.swift in Sources */,
 				8DC61B5D2ED985360043BB28 /* OwnerManagementView.swift in Sources */,
@@ -300,11 +303,14 @@
 				8DC61B762EE004D90043BB28 /* PieChartView.swift in Sources */,
 				8DC61B632ED985360043BB28 /* PaymentMethod.swift in Sources */,
 				8DC61B642ED985360043BB28 /* BillViewModel.swift in Sources */,
-				8DC61B912EE68BC00043BB28 /* CloudSyncSettingsView.swift in Sources */,
 				8DC61B652ED985360043BB28 /* BillListView.swift in Sources */,
 				8DC61B662ED985360043BB28 /* DataRepository.swift in Sources */,
 				8DC61B672ED985360043BB28 /* UserDefaultsRepository.swift in Sources */,
+				8DBA37942EE6BA8B007FBEA5 /* CloudSyncSettingsView.swift in Sources */,
 				8DC61B682ED985360043BB28 /* StatisticsViewModel.swift in Sources */,
+				8DBA37902EE6BA76007FBEA5 /* AutoSyncManager.swift in Sources */,
+				8DBA37912EE6BA76007FBEA5 /* CloudKitRepository.swift in Sources */,
+				8DBA37922EE6BA76007FBEA5 /* CloudKitSyncManager.swift in Sources */,
 				8DC61B692ED985360043BB28 /* ExportViewModel.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
