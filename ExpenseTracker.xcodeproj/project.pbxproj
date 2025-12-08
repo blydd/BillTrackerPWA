@@ -42,10 +42,7 @@
 		8DC61B792EE0231B0043BB28 /* DatabaseManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8DC61B772EE0231B0043BB28 /* DatabaseManager.swift */; };
 		8DC61B7A2EE0231B0043BB28 /* SQLiteRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8DC61B782EE0231B0043BB28 /* SQLiteRepository.swift */; };
 		8DC61B7C2EE023330043BB28 /* DatabaseInfoView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8DC61B7B2EE023330043BB28 /* DatabaseInfoView.swift */; };
-		8DC61B8D2EE68BA90043BB28 /* CloudKitRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8DC61B8B2EE68BA90043BB28 /* CloudKitRepository.swift */; };
-		8DC61B8E2EE68BA90043BB28 /* CloudKitSyncManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8DC61B8C2EE68BA90043BB28 /* CloudKitSyncManager.swift */; };
-		8DC61B8F2EE68BA90043BB28 /* AutoSyncManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8DC61B8A2EE68BA90043BB28 /* AutoSyncManager.swift */; };
-		8DC61B912EE68BC00043BB28 /* CloudSyncSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8DC61B902EE68BC00043BB28 /* CloudSyncSettingsView.swift */; };
+
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -86,10 +83,7 @@
 		8DC61B782EE0231B0043BB28 /* SQLiteRepository.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SQLiteRepository.swift; sourceTree = "<group>"; };
 		8DC61B7B2EE023330043BB28 /* DatabaseInfoView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DatabaseInfoView.swift; sourceTree = "<group>"; };
 		8DC61B832EE661450043BB28 /* Untitled.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Untitled.swift; sourceTree = "<group>"; };
-		8DC61B8A2EE68BA90043BB28 /* AutoSyncManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AutoSyncManager.swift; sourceTree = "<group>"; };
-		8DC61B8B2EE68BA90043BB28 /* CloudKitRepository.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CloudKitRepository.swift; sourceTree = "<group>"; };
-		8DC61B8C2EE68BA90043BB28 /* CloudKitSyncManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CloudKitSyncManager.swift; sourceTree = "<group>"; };
-		8DC61B902EE68BC00043BB28 /* CloudSyncSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CloudSyncSettingsView.swift; sourceTree = "<group>"; };
+
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
