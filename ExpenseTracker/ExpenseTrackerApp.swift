@@ -11,6 +11,11 @@ struct ExpenseTrackerApp: App {
     
     var body: some Scene {
         WindowGroup {
+            // 临时禁用云同步以测试 IAP 功能
+            ContentView(repository: repository)
+            
+            // 如果需要云同步，取消下面的注释并注释掉上面的代码
+            /*
             #if targetEnvironment(simulator)
             // 模拟器：不使用云同步
             ContentView(repository: repository)
@@ -18,6 +23,7 @@ struct ExpenseTrackerApp: App {
             // 真机：使用云同步
             ContentViewWithSync(repository: repository)
             #endif
+            */
         }
     }
     
@@ -38,6 +44,7 @@ struct ExpenseTrackerApp: App {
 
 struct ContentView: View {
     let repository: DataRepository
+    @StateObject private var subscriptionManager = SubscriptionManager.shared
     
     var body: some View {
         TabView {
@@ -62,18 +69,57 @@ struct ContentView: View {
                 Label("设置", systemImage: "gearshape")
             }
         }
+        .environmentObject(subscriptionManager)
+        .task {
+            await subscriptionManager.refreshSubscriptionStatus()
+        }
     }
 }
 
 struct SettingsView: View {
     let repository: DataRepository
+    @StateObject private var subscriptionManager = SubscriptionManager.shared
+    @State private var showingPurchase = false
     
     var body: some View {
         List {
+            // 订阅状态
+            Section("订阅状态") {
+                HStack {
+                    Image(systemName: subscriptionManager.isProUser ? "crown.fill" : "star")
+                        .foregroundColor(subscriptionManager.isProUser ? .yellow : .gray)
+                        .font(.title2)
+                    
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(subscriptionManager.subscriptionStatus.displayStatus)
+                            .font(.headline)
+                        
+                        if !subscriptionManager.isProUser {
+                            Text("升级解锁更多功能")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                    }
+                    
+                    Spacer()
+                    
+                    if !subscriptionManager.isProUser {
+                        Button("升级") {
+                            showingPurchase = true
+                        }
+                        .buttonStyle(.borderedProminent)
+                    }
+                }
+            }
+            
+            // 临时禁用云同步 Section 以测试 IAP 功能
+            // 如果需要云同步，取消下面的注释
+            /*
             #if !targetEnvironment(simulator)
             // 云同步状态（仅在真机上显示）
             CloudSyncSection()
             #endif
+            */
             
             Section("数据管理") {
                 NavigationLink("账单类型管理") {
@@ -86,6 +132,10 @@ struct SettingsView: View {
                 
                 NavigationLink("支付方式管理") {
                     PaymentMethodListView(repository: repository)
+                }
+                
+                NavigationLink("数据库导出") {
+                    DatabaseExportView()
                 }
             }
             
@@ -114,6 +164,9 @@ struct SettingsView: View {
             }
         }
         .navigationTitle("设置")
+        .sheet(isPresented: $showingPurchase) {
+            PurchaseView()
+        }
     }
     
     private func timeAgo(_ date: Date) -> String {

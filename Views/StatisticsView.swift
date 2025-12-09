@@ -37,29 +37,84 @@ struct StatisticsView: View {
             }
             .listRowBackground(Color.clear)
             
-            Section("总览") {
-                HStack {
-                    Text("总收入")
-                    Spacer()
-                    Text("\(viewModel.totalIncome as NSDecimalNumber)")
-                        .foregroundColor(.green)
-                }
-                
-                HStack {
-                    Text("总支出")
-                    Spacer()
-                    Text("\(viewModel.totalExpense as NSDecimalNumber)")
-                        .foregroundColor(.red)
-                }
-                
-                HStack {
-                    Text("净收入")
-                    Spacer()
+            Section {
+                VStack(spacing: 12) {
+                    // 总收入
+                    HStack(spacing: 12) {
+                        Image(systemName: "arrow.down.circle.fill")
+                            .font(.system(size: 20))
+                            .foregroundColor(.green)
+                        
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("总收入")
+                                .font(.subheadline)
+                                .foregroundColor(.secondary)
+                            Text("\(viewModel.totalIncome as NSDecimalNumber)")
+                                .font(.system(size: 18, weight: .semibold))
+                                .foregroundColor(.green)
+                        }
+                        
+                        Spacer()
+                    }
+                    .padding(12)
+                    .background(Color.green.opacity(0.08))
+                    .cornerRadius(8)
+                    
+                    // 总支出
+                    HStack(spacing: 12) {
+                        Image(systemName: "arrow.up.circle.fill")
+                            .font(.system(size: 20))
+                            .foregroundColor(.red)
+                        
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("总支出")
+                                .font(.subheadline)
+                                .foregroundColor(.secondary)
+                            Text("\(viewModel.totalExpense as NSDecimalNumber)")
+                                .font(.system(size: 18, weight: .semibold))
+                                .foregroundColor(.red)
+                        }
+                        
+                        Spacer()
+                    }
+                    .padding(12)
+                    .background(Color.red.opacity(0.08))
+                    .cornerRadius(8)
+                    
+                    // 净收入
                     let net = viewModel.totalIncome - viewModel.totalExpense
-                    Text("\(net as NSDecimalNumber)")
-                        .foregroundColor(net >= 0 ? .green : .red)
+                    let isPositive = net >= 0
+                    
+                    HStack(spacing: 12) {
+                        Image(systemName: isPositive ? "plus.circle.fill" : "minus.circle.fill")
+                            .font(.system(size: 20))
+                            .foregroundColor(isPositive ? .blue : .orange)
+                        
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("净收入")
+                                .font(.subheadline)
+                                .foregroundColor(.secondary)
+                            Text("\(net as NSDecimalNumber)")
+                                .font(.system(size: 18, weight: .semibold))
+                                .foregroundColor(isPositive ? .blue : .orange)
+                        }
+                        
+                        Spacer()
+                    }
+                    .padding(12)
+                    .background((isPositive ? Color.blue : Color.orange).opacity(0.08))
+                    .cornerRadius(8)
+                }
+                .padding(.vertical, 4)
+            } header: {
+                HStack {
+                    Image(systemName: "chart.bar.fill")
+                        .font(.caption)
+                    Text("总览")
                 }
             }
+            .listRowBackground(Color.clear)
+            .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 4, trailing: 16))
             
             if !viewModel.categoryStatistics.isEmpty {
                 Section {
@@ -82,17 +137,35 @@ struct StatisticsView: View {
                         .padding(.vertical, 8)
                     } else {
                         ForEach(filteredCategoryStatistics, id: \.key) { item in
-                            HStack {
+                            HStack(spacing: 10) {
+                                // 类型图标
+                                Image(systemName: "tag.fill")
+                                    .font(.system(size: 12))
+                                    .foregroundColor(.orange.opacity(0.7))
+                                
                                 Text(item.key)
+                                    .font(.system(size: 15))
+                                
                                 Spacer()
+                                
                                 Text("\(item.value as NSDecimalNumber)")
+                                    .font(.system(size: 15, weight: .medium))
                                     .foregroundColor(colorForTab(categoryTab))
                             }
+                            .padding(.vertical, 6)
+                            .padding(.horizontal, 10)
+                            .background(colorForTab(categoryTab).opacity(0.05))
+                            .cornerRadius(6)
                         }
                     }
                 } header: {
-                    Text("按类型统计")
+                    HStack {
+                        Image(systemName: "square.grid.2x2.fill")
+                            .font(.caption)
+                        Text("按类型统计")
+                    }
                 }
+                .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 4, trailing: 16))
             }
             
             if !viewModel.ownerStatistics.isEmpty {
@@ -116,17 +189,35 @@ struct StatisticsView: View {
                         .padding(.vertical, 8)
                     } else {
                         ForEach(filteredOwnerStatistics, id: \.key) { item in
-                            HStack {
+                            HStack(spacing: 10) {
+                                // 归属人图标
+                                Image(systemName: "person.fill")
+                                    .font(.system(size: 12))
+                                    .foregroundColor(.green.opacity(0.7))
+                                
                                 Text(item.key)
+                                    .font(.system(size: 15))
+                                
                                 Spacer()
+                                
                                 Text("\(item.value as NSDecimalNumber)")
+                                    .font(.system(size: 15, weight: .medium))
                                     .foregroundColor(colorForTab(ownerTab))
                             }
+                            .padding(.vertical, 6)
+                            .padding(.horizontal, 10)
+                            .background(colorForTab(ownerTab).opacity(0.05))
+                            .cornerRadius(6)
                         }
                     }
                 } header: {
-                    Text("按归属人统计")
+                    HStack {
+                        Image(systemName: "person.2.fill")
+                            .font(.caption)
+                        Text("按归属人统计")
+                    }
                 }
+                .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 4, trailing: 16))
             }
             
             if !viewModel.paymentMethodStatistics.isEmpty {
@@ -150,17 +241,35 @@ struct StatisticsView: View {
                         .padding(.vertical, 8)
                     } else {
                         ForEach(filteredPaymentStatistics, id: \.key) { item in
-                            HStack {
+                            HStack(spacing: 10) {
+                                // 支付方式图标
+                                Image(systemName: "creditcard.fill")
+                                    .font(.system(size: 12))
+                                    .foregroundColor(.blue.opacity(0.7))
+                                
                                 Text(item.key)
+                                    .font(.system(size: 15))
+                                
                                 Spacer()
+                                
                                 Text("\(item.value as NSDecimalNumber)")
+                                    .font(.system(size: 15, weight: .medium))
                                     .foregroundColor(colorForTab(paymentTab))
                             }
+                            .padding(.vertical, 6)
+                            .padding(.horizontal, 10)
+                            .background(colorForTab(paymentTab).opacity(0.05))
+                            .cornerRadius(6)
                         }
                     }
                 } header: {
-                    Text("按支付方式统计")
+                    HStack {
+                        Image(systemName: "creditcard.and.123")
+                            .font(.caption)
+                        Text("按支付方式统计")
+                    }
                 }
+                .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 4, trailing: 16))
             }
         }
         .refreshable {

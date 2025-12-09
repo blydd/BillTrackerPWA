@@ -7,6 +7,7 @@ struct BillListView: View {
     @StateObject private var ownerViewModel: OwnerViewModel
     @StateObject private var paymentViewModel: PaymentMethodViewModel
     @StateObject private var exportViewModel: ExportViewModel
+    @StateObject private var subscriptionManager = SubscriptionManager.shared
     
     @State private var showingAddSheet = false
     @State private var showingError = false
@@ -16,6 +17,9 @@ struct BillListView: View {
     @State private var isFilterExpanded = true
     @State private var showScrollToTopButton = false
     @State private var editingBill: Bill?
+    @State private var showingUpgradePrompt = false
+    @State private var upgradePromptFeature = ""
+    @State private var showingExportConfirmation = false
     
     // 筛选条件
     @State private var selectedOwnerIds: Set<UUID> = []
@@ -45,6 +49,27 @@ struct BillListView: View {
     
     var body: some View {
         VStack(spacing: 0) {
+            // 账单限制警告
+            if let warning = subscriptionManager.getBillLimitWarning(currentBillCount: billViewModel.bills.count) {
+                HStack {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .foregroundColor(.orange)
+                    Text(warning)
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                    Spacer()
+                    Button("升级") {
+                        upgradePromptFeature = "unlimited_bills"
+                        showingUpgradePrompt = true
+                    }
+                    .font(.caption)
+                    .buttonStyle(.borderedProminent)
+                }
+                .padding(.horizontal)
+                .padding(.vertical, 8)
+                .background(Color.orange.opacity(0.1))
+            }
+            
             // 筛选条件显示区域（可折叠）
             if hasActiveFilters {
                 VStack(spacing: 0) {
@@ -152,9 +177,20 @@ struct BillListView: View {
                                     Button(role: .destructive) {
                                         Task {
                                             do {
+                                                print("🔴 UI: 开始删除账单 \(bill.id)")
                                                 try await billViewModel.deleteBill(bill)
+                                                print("✅ UI: 删除成功，重新加载数据")
+                                                
+                                                // 清除缓存
+                                                clearCache()
+                                                
+                                                // 重新加载所有数据
                                                 await loadData()
+                                                
+                                                print("✅ UI: 数据重载完成，当前账单数: \(billViewModel.bills.count)")
                                             } catch {
+                                                print("❌ UI: 删除失败: \(error)")
+                                                billViewModel.errorMessage = "删除失败: \(error.localizedDescription)"
                                                 showingError = true
                                             }
                                         }
@@ -162,7 +198,7 @@ struct BillListView: View {
                                         Label("删除", systemImage: "trash")
                                     }
                                 }
-                                .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
+                                .listRowInsets(EdgeInsets(top: 3, leading: 12, bottom: 3, trailing: 12))
                             }
                         } header: {
                             DailySummaryHeader(
@@ -222,8 +258,15 @@ struct BillListView: View {
                             } else {
                                 Image(systemName: "square.and.arrow.up")
                                     .font(.title3)
-                                Text("导出")
-                                    .font(.headline)
+                                VStack(alignment: .leading, spacing: 0) {
+                                    Text("导出")
+                                        .font(.headline)
+                                    if hasActiveFilters {
+                                        Text("\(filteredBills.count)条")
+                                            .font(.system(size: 9))
+                                            .foregroundColor(.blue)
+                                    }
+                                }
                             }
                         }
                     }
@@ -279,6 +322,14 @@ struct BillListView: View {
                 Text(error)
             }
         }
+        .alert("确认导出", isPresented: $showingExportConfirmation) {
+            Button("取消", role: .cancel) {}
+            Button("导出") {
+                performExport()
+            }
+        } message: {
+            Text(exportConfirmationMessage)
+        }
         .sheet(isPresented: $showingFilterSheet) {
             FilterSheetView(
                 owners: ownerViewModel.owners,
@@ -296,6 +347,12 @@ struct BillListView: View {
         .task {
             await loadData()
         }
+        .upgradePrompt(
+            isPresented: $showingUpgradePrompt,
+            title: upgradePromptTitle,
+            message: upgradePromptMessage,
+            feature: upgradePromptFeature
+        )
     }
     
     // 筛选后的账单（带缓存）
@@ -522,19 +579,123 @@ struct BillListView: View {
     }
     
     private func exportBills() {
+        // 检查导出权限
+        if !subscriptionManager.canExportData {
+            upgradePromptFeature = "export"
+            showingUpgradePrompt = true
+            return
+        }
+        
+        // 显示确认对话框
+        showingExportConfirmation = true
+    }
+    
+    private func performExport() {
         Task {
             do {
+                // 使用筛选后的账单进行导出
+                let billsToExport = hasActiveFilters ? filteredBills : billViewModel.bills
+                
+                print("📤 导出账单: 总数=\(billViewModel.bills.count), 筛选后=\(billsToExport.count)")
+                if hasActiveFilters {
+                    print("  筛选条件:")
+                    if !selectedOwnerIds.isEmpty {
+                        print("  - 归属人: \(selectedOwnerIds.count) 个")
+                    }
+                    if !selectedCategoryIds.isEmpty {
+                        print("  - 账单类型: \(selectedCategoryIds.count) 个")
+                    }
+                    if !selectedPaymentMethodIds.isEmpty {
+                        print("  - 支付方式: \(selectedPaymentMethodIds.count) 个")
+                    }
+                    if startDate != nil || endDate != nil {
+                        print("  - 日期范围: \(startDate != nil ? "有开始日期" : "") \(endDate != nil ? "有结束日期" : "")")
+                    }
+                }
+                
                 let fileURL = try await exportViewModel.exportToCSV(
-                    bills: billViewModel.bills,
+                    bills: billsToExport,
                     categories: categoryViewModel.categories,
                     owners: ownerViewModel.owners,
                     paymentMethods: paymentViewModel.paymentMethods
                 )
                 exportedFileURL = fileURL
                 showingExportSheet = true
+                
+                print("✅ 导出成功: \(fileURL.lastPathComponent)")
             } catch {
+                print("❌ 导出失败: \(error)")
                 showingError = true
             }
+        }
+    }
+    
+    private var exportConfirmationMessage: String {
+        let billsToExport = hasActiveFilters ? filteredBills : billViewModel.bills
+        let count = billsToExport.count
+        
+        if hasActiveFilters {
+            var conditions: [String] = []
+            
+            if !selectedOwnerIds.isEmpty {
+                let names = selectedOwnerIds.compactMap { id in
+                    ownerViewModel.owners.first(where: { $0.id == id })?.name
+                }.joined(separator: "、")
+                conditions.append("归属人: \(names)")
+            }
+            
+            if !selectedCategoryIds.isEmpty {
+                let names = selectedCategoryIds.compactMap { id in
+                    categoryViewModel.categories.first(where: { $0.id == id })?.name
+                }.joined(separator: "、")
+                conditions.append("类型: \(names)")
+            }
+            
+            if !selectedPaymentMethodIds.isEmpty {
+                let count = selectedPaymentMethodIds.count
+                conditions.append("支付方式: \(count)个")
+            }
+            
+            if let start = startDate, let end = endDate {
+                let formatter = DateFormatter()
+                formatter.dateFormat = "MM-dd"
+                conditions.append("日期: \(formatter.string(from: start))~\(formatter.string(from: end))")
+            } else if let start = startDate {
+                let formatter = DateFormatter()
+                formatter.dateFormat = "MM-dd"
+                conditions.append("日期: \(formatter.string(from: start))起")
+            } else if let end = endDate {
+                let formatter = DateFormatter()
+                formatter.dateFormat = "MM-dd"
+                conditions.append("日期: 至\(formatter.string(from: end))")
+            }
+            
+            let conditionText = conditions.joined(separator: "\n")
+            return "将导出符合以下条件的 \(count) 条账单：\n\n\(conditionText)"
+        } else {
+            return "将导出全部 \(count) 条账单"
+        }
+    }
+    
+    private var upgradePromptTitle: String {
+        switch upgradePromptFeature {
+        case "unlimited_bills":
+            return "已达到账单上限"
+        case "export":
+            return "Pro 功能"
+        default:
+            return "升级到 Pro"
+        }
+    }
+    
+    private var upgradePromptMessage: String {
+        switch upgradePromptFeature {
+        case "unlimited_bills":
+            return "免费版最多支持 500 条账单记录\n升级到 Pro 版解锁无限账单"
+        case "export":
+            return "数据导出功能仅限 Pro 用户使用\n升级解锁 CSV 和数据库导出"
+        default:
+            return "升级到 Pro 版解锁所有高级功能"
         }
     }
     
@@ -545,16 +706,23 @@ struct BillListView: View {
             for index in offsets {
                 let bill = bills[index]
                 do {
+                    print("🔴 UI: 批量删除账单 \(bill.id)")
                     try await billViewModel.deleteBill(bill)
                 } catch {
+                    print("❌ UI: 批量删除失败: \(error)")
+                    billViewModel.errorMessage = "删除失败: \(error.localizedDescription)"
                     showingError = true
                 }
             }
+            
+            // 删除完成后重新加载数据
+            clearCache()
+            await loadData()
         }
     }
 }
 
-/// 每日汇总头部视图
+/// 每日汇总头部视图（紧凑版）
 struct DailySummaryHeader: View {
     let date: String
     let bills: [Bill]
@@ -562,28 +730,32 @@ struct DailySummaryHeader: View {
     let categories: [BillCategory]
     
     var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
+        HStack(spacing: 12) {
             Text(date)
-                .font(.headline)
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundColor(.primary)
             
-            HStack(spacing: 16) {
-                HStack(spacing: 4) {
-                    Text("收入:")
-                        .font(.caption)
-                    Text("¥\(dailyIncome as NSDecimalNumber, formatter: numberFormatter)")
-                        .font(.caption)
-                        .foregroundColor(.green)
-                }
-                
-                HStack(spacing: 4) {
-                    Text("支出:")
-                        .font(.caption)
-                    Text("¥\(dailyExpense as NSDecimalNumber, formatter: numberFormatter)")
-                        .font(.caption)
-                        .foregroundColor(.red)
-                }
+            Spacer()
+            
+            HStack(spacing: 3) {
+                Image(systemName: "arrow.down.circle.fill")
+                    .font(.system(size: 10))
+                    .foregroundColor(.green)
+                Text("¥\(dailyIncome as NSDecimalNumber, formatter: numberFormatter)")
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundColor(.green)
+            }
+            
+            HStack(spacing: 3) {
+                Image(systemName: "arrow.up.circle.fill")
+                    .font(.system(size: 10))
+                    .foregroundColor(.red)
+                Text("¥\(dailyExpense as NSDecimalNumber, formatter: numberFormatter)")
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundColor(.red)
             }
         }
+        .padding(.vertical, 2)
         .textCase(nil)
     }
     
@@ -661,76 +833,159 @@ struct BillRowView: View {
     }
     
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            // 第一行：金额、时间和编辑按钮
-            HStack(alignment: .center) {
-                Text("¥\(bill.amount as NSDecimalNumber, formatter: amountFormatter)")
-                    .font(.system(size: 18, weight: .semibold))
-                    .foregroundColor(transactionColor)
-                
-                Spacer()
-                
-                Text(formattedDateTime)
-                    .font(.system(size: 13))
-                    .foregroundColor(.secondary)
-                
-                if let onEdit = onEdit {
-                    Button(action: { onEdit(bill) }) {
-                        Image(systemName: "pencil.circle")
-                            .font(.system(size: 18))
-                            .foregroundColor(.blue)
+        HStack(spacing: 0) {
+            // 左侧彩色指示条
+            Rectangle()
+                .fill(transactionTypeGradient)
+                .frame(width: 3)
+            
+            // 主内容区域
+            VStack(alignment: .leading, spacing: 4) {
+                // 第一行：类型图标 + 金额 + 时间 + 编辑
+                HStack(alignment: .center, spacing: 6) {
+                    // 类型图标（更小）
+                    Image(systemName: transactionTypeIcon)
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundColor(transactionColor)
+                        .frame(width: 20, height: 20)
+                        .background(transactionColor.opacity(0.12))
+                        .cornerRadius(4)
+                    
+                    // 金额（单行显示，包含类型标签）
+                    HStack(spacing: 4) {
+                        Text(transactionTypeLabel)
+                            .font(.system(size: 10, weight: .medium))
+                            .foregroundColor(transactionColor.opacity(0.7))
+                        
+                        Text("¥\(formattedAmount)")
+                            .font(.system(size: 17, weight: .bold))
+                            .foregroundColor(transactionColor)
                     }
-                    .buttonStyle(.plain)
-                }
-            }
-            
-            // 第二行：所有标签（归属人、支付方式、账单类型）
-            let categoryList = bill.categoryIds.compactMap { id in
-                categories.first(where: { $0.id == id })
-            }
-            
-            FlowLayout(spacing: 6) {
-                // 归属人标签
-                if let owner = owners.first(where: { $0.id == bill.ownerId }) {
-                    CompactTagView(text: owner.name, color: .green)
+                    
+                    Spacer()
+                    
+                    // 时间
+                    Text(formattedDateTime)
+                        .font(.system(size: 11))
+                        .foregroundColor(.secondary)
+                    
+                    // 编辑按钮（仅图标）
+                    if let onEdit = onEdit {
+                        Button(action: { onEdit(bill) }) {
+                            Image(systemName: "pencil.circle.fill")
+                                .font(.system(size: 18))
+                                .foregroundColor(.blue.opacity(0.8))
+                        }
+                        .buttonStyle(.plain)
+                    }
                 }
                 
-                // 支付方式标签
-                if let payment = paymentMethods.first(where: { $0.id == bill.paymentMethodId }) {
-                    CompactTagView(text: displayPaymentMethodName(payment.name), color: .blue)
+                // 第二行：标签（更紧凑）
+                let categoryList = bill.categoryIds.compactMap { id in
+                    categories.first(where: { $0.id == id })
                 }
                 
-                // 账单类型标签
-                ForEach(categoryList) { category in
-                    CompactTagView(text: category.name, color: .orange)
+                FlowLayout(spacing: 4) {
+                    // 归属人标签
+                    if let owner = owners.first(where: { $0.id == bill.ownerId }) {
+                        CompactTagView(
+                            icon: "person.fill",
+                            text: owner.name,
+                            color: .green,
+                            style: transactionType == .excluded ? .muted : .normal
+                        )
+                    }
+                    
+                    // 支付方式标签
+                    if let payment = paymentMethods.first(where: { $0.id == bill.paymentMethodId }) {
+                        CompactTagView(
+                            icon: payment.accountType == .credit ? "creditcard.fill" : "banknote.fill",
+                            text: displayPaymentMethodName(payment.name),
+                            color: .blue,
+                            style: transactionType == .excluded ? .muted : .normal
+                        )
+                    }
+                    
+                    // 账单类型标签
+                    ForEach(categoryList) { category in
+                        CompactTagView(
+                            icon: "tag.fill",
+                            text: category.name,
+                            color: .orange,
+                            style: transactionType == .excluded ? .muted : .normal
+                        )
+                    }
+                }
+                
+                // 备注（如果有，更紧凑）
+                if let note = bill.note, !note.isEmpty {
+                    HStack(spacing: 3) {
+                        Image(systemName: "note.text")
+                            .font(.system(size: 9))
+                            .foregroundColor(.secondary.opacity(0.6))
+                        
+                        Text(note)
+                            .font(.system(size: 11))
+                            .foregroundColor(.secondary)
+                            .lineLimit(1)
+                    }
                 }
             }
-            
-            // 备注（如果有）
-            if let note = bill.note, !note.isEmpty {
-                Text(note)
-                    .font(.system(size: 13))
-                    .foregroundColor(.secondary)
-                    .lineLimit(2)
-            }
+            .padding(.leading, 8)
+            .padding(.trailing, 8)
+            .padding(.vertical, 6)
         }
-        .padding(.vertical, 8)
+        .background(transactionBackgroundColor)
+        .cornerRadius(6)
+        .overlay(
+            RoundedRectangle(cornerRadius: 6)
+                .stroke(transactionBorderColor, lineWidth: transactionType == .excluded ? 1 : 0)
+        )
     }
     
-    // 格式化日期时间为 yyyy-MM-dd HH:mm:ss
-    private var formattedDateTime: String {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
-        return formatter.string(from: bill.createdAt)
-    }
-    
-    // 根据交易类型返回颜色
-    private var transactionColor: Color {
-        guard let payment = paymentMethods.first(where: { $0.id == bill.paymentMethodId }) else {
-            return .primary
+    // 获取交易类型
+    private var transactionType: TransactionType {
+        // 检查账单的所有类型
+        let categoryList = bill.categoryIds.compactMap { id in
+            categories.first(where: { $0.id == id })
         }
         
-        switch payment.transactionType {
+        // 如果所有类型都是不计入，则为不计入类型
+        if !categoryList.isEmpty && categoryList.allSatisfy({ $0.transactionType == .excluded }) {
+            return .excluded
+        }
+        
+        // 根据金额判断收入/支出
+        return bill.amount > 0 ? .income : .expense
+    }
+    
+    // 交易类型标签
+    private var transactionTypeLabel: String {
+        switch transactionType {
+        case .income:
+            return "收入"
+        case .expense:
+            return "支出"
+        case .excluded:
+            return "不计入"
+        }
+    }
+    
+    // 交易类型图标
+    private var transactionTypeIcon: String {
+        switch transactionType {
+        case .income:
+            return "arrow.down.circle.fill"
+        case .expense:
+            return "arrow.up.circle.fill"
+        case .excluded:
+            return "minus.circle.fill"
+        }
+    }
+    
+    // 交易类型颜色
+    private var transactionColor: Color {
+        switch transactionType {
         case .income:
             return .green
         case .expense:
@@ -738,6 +993,71 @@ struct BillRowView: View {
         case .excluded:
             return .gray
         }
+    }
+    
+    // 交易类型渐变色（左侧指示条）
+    private var transactionTypeGradient: LinearGradient {
+        switch transactionType {
+        case .income:
+            return LinearGradient(
+                colors: [Color.green.opacity(0.8), Color.green],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+        case .expense:
+            return LinearGradient(
+                colors: [Color.red.opacity(0.8), Color.red],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+        case .excluded:
+            return LinearGradient(
+                colors: [Color.gray.opacity(0.5), Color.gray.opacity(0.7)],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+        }
+    }
+    
+    // 背景颜色
+    private var transactionBackgroundColor: Color {
+        switch transactionType {
+        case .income:
+            return Color.green.opacity(0.05)
+        case .expense:
+            return Color.red.opacity(0.05)
+        case .excluded:
+            return Color.gray.opacity(0.03)
+        }
+    }
+    
+    // 边框颜色
+    private var transactionBorderColor: Color {
+        switch transactionType {
+        case .income:
+            return .clear
+        case .expense:
+            return .clear
+        case .excluded:
+            return Color.gray.opacity(0.3)
+        }
+    }
+    
+    // 格式化金额（显示绝对值）
+    private var formattedAmount: String {
+        let absAmount = abs(bill.amount)
+        let formatter = NumberFormatter()
+        formatter.numberStyle = .decimal
+        formatter.minimumFractionDigits = 2
+        formatter.maximumFractionDigits = 2
+        return formatter.string(from: absAmount as NSDecimalNumber) ?? "0.00"
+    }
+    
+    // 格式化日期时间
+    private var formattedDateTime: String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "MM-dd HH:mm"
+        return formatter.string(from: bill.createdAt)
     }
     
     private var amountFormatter: NumberFormatter {
@@ -750,12 +1070,64 @@ struct BillRowView: View {
     
     /// 处理支付方式名称显示，去掉"归属人-"前缀
     private func displayPaymentMethodName(_ name: String) -> String {
-        // 如果名称包含"-"，则去掉第一个"-"之前的部分
         if let dashIndex = name.firstIndex(of: "-") {
             let startIndex = name.index(after: dashIndex)
             return String(name[startIndex...])
         }
         return name
+    }
+}
+
+/// 紧凑标签视图（带图标）
+struct CompactTagView: View {
+    let icon: String
+    let text: String
+    let color: Color
+    var style: TagStyle = .normal
+    
+    enum TagStyle {
+        case normal
+        case muted
+    }
+    
+    var body: some View {
+        HStack(spacing: 3) {
+            Image(systemName: icon)
+                .font(.system(size: 8))
+            Text(text)
+                .font(.system(size: 10, weight: .medium))
+        }
+        .padding(.horizontal, 6)
+        .padding(.vertical, 3)
+        .background(backgroundColor)
+        .foregroundColor(foregroundColor)
+        .cornerRadius(4)
+        .overlay(
+            RoundedRectangle(cornerRadius: 4)
+                .stroke(borderColor, lineWidth: style == .muted ? 0.5 : 0)
+        )
+    }
+    
+    private var backgroundColor: Color {
+        switch style {
+        case .normal:
+            return color.opacity(0.15)
+        case .muted:
+            return Color.clear
+        }
+    }
+    
+    private var foregroundColor: Color {
+        switch style {
+        case .normal:
+            return color
+        case .muted:
+            return color.opacity(0.6)
+        }
+    }
+    
+    private var borderColor: Color {
+        color.opacity(0.3)
     }
 }
 
@@ -772,22 +1144,6 @@ struct TagView: View {
             .background(color.opacity(0.2))
             .foregroundColor(color)
             .cornerRadius(8)
-    }
-}
-
-/// 紧凑标签视图组件（用于账单列表）
-struct CompactTagView: View {
-    let text: String
-    let color: Color
-    
-    var body: some View {
-        Text(text)
-            .font(.system(size: 13))
-            .padding(.horizontal, 8)
-            .padding(.vertical, 3)
-            .background(color.opacity(0.15))
-            .foregroundColor(color)
-            .cornerRadius(6)
     }
 }
 

@@ -3,12 +3,50 @@ import SwiftUI
 /// 云同步设置视图
 struct CloudSyncSettingsView: View {
     @EnvironmentObject var syncManager: AutoSyncManager
+    @StateObject private var subscriptionManager = SubscriptionManager.shared
     @State private var showingError = false
+    @State private var showingPurchase = false
     
     var body: some View {
         List {
-            // 同步状态
-            Section {
+            // Pro 功能检查
+            if !subscriptionManager.canUseCloudSync {
+                Section {
+                    VStack(spacing: 16) {
+                        Image(systemName: "crown.fill")
+                            .font(.system(size: 50))
+                            .foregroundColor(.yellow)
+                        
+                        Text("云同步是 Pro 功能")
+                            .font(.headline)
+                        
+                        Text("升级到 Pro 版解锁 iCloud 云同步，在多设备间同步您的账单数据")
+                            .font(.subheadline)
+                            .foregroundColor(.secondary)
+                            .multilineTextAlignment(.center)
+                        
+                        Button {
+                            showingPurchase = true
+                        } label: {
+                            Text("升级到 Pro")
+                                .font(.headline)
+                                .foregroundColor(.white)
+                                .frame(maxWidth: .infinity)
+                                .padding()
+                                .background(Color.blue)
+                                .cornerRadius(12)
+                        }
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding()
+                }
+                .sheet(isPresented: $showingPurchase) {
+                    PurchaseView()
+                }
+            } else {
+                // 原有的云同步设置内容
+                // 同步状态
+                Section {
                 HStack {
                     Image(systemName: "icloud.fill")
                         .foregroundColor(syncManager.isSyncing ? .blue : .gray)
@@ -109,6 +147,7 @@ struct CloudSyncSettingsView: View {
                         .foregroundColor(.secondary)
                 }
                 .padding(.vertical, 4)
+            }
             }
         }
         .navigationTitle("云同步设置")

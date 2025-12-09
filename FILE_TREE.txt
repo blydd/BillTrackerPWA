@@ -1,0 +1,101 @@
+ExpenseTracker IAP 功能 - 文件结构
+=====================================
+
+📁 项目根目录
+│
+├── 📁 Models/
+│   ├── SubscriptionTier.swift          ✨ 新增 - 订阅模型
+│   ├── AccountType.swift               ✓ 已存在
+│   ├── AppError.swift                  📝 需修改 - 添加新错误
+│   ├── Bill.swift                      ✓ 已存在
+│   ├── BillCategory.swift              ✓ 已存在
+│   ├── Owner.swift                     ✓ 已存在
+│   ├── PaymentMethod.swift             ✓ 已存在
+│   └── TransactionType.swift           ✓ 已存在
+│
+├── 📁 Services/                        ✨ 新文件夹
+│   ├── IAPManager.swift                ✨ 新增 - IAP 核心管理
+│   └── SubscriptionManager.swift       ✨ 新增 - 订阅状态管理
+│
+├── 📁 ViewModels/
+│   ├── BillViewModel.swift             ✓ 已存在
+│   ├── CategoryViewModel.swift         ✓ 已存在
+│   ├── ExportViewModel.swift           📝 需修改 - 添加权限检查
+│   ├── InitializationViewModel.swift   ✓ 已存在
+│   ├── OwnerViewModel.swift            ✓ 已存在
+│   ├── PaymentMethodViewModel.swift    ✓ 已存在
+│   └── StatisticsViewModel.swift       ✓ 已存在
+│
+├── 📁 Views/
+│   ├── BillFormView.swift              📝 需修改 - 添加账单限制
+│   ├── BillListView.swift              📝 需修改 - 添加警告和导出限制
+│   ├── CategoryManagementView.swift    ✓ 已存在
+│   ├── ChartStatisticsView.swift       ✓ 已存在
+│   ├── CloudSyncSettingsView.swift     📝 需修改 - 添加权限检查
+│   ├── DatabaseExportView.swift        ✨ 新增 - 数据库导出
+│   ├── DatabaseInfoView.swift          ✓ 已存在
+│   ├── DeleteConfirmationModifier.swift ✓ 已存在
+│   ├── EmptyStateView.swift            ✓ 已存在
+│   ├── ErrorAlertModifier.swift        ✓ 已存在
+│   ├── ErrorHandlingExampleView.swift  ✓ 已存在
+│   ├── InitializationView.swift        ✓ 已存在
+│   ├── LoadingView.swift               ✓ 已存在
+│   ├── OwnerManagementView.swift       ✓ 已存在
+│   ├── PaymentMethodListView.swift     ✓ 已存在
+│   ├── PieChartView.swift              ✓ 已存在
+│   ├── PurchaseView.swift              ✨ 新增 - 购买界面
+│   ├── StatisticsView.swift            📝 需修改 - 添加导出入口
+│   ├── ToastView.swift                 ✓ 已存在
+│   └── UpgradePromptView.swift         ✨ 新增 - 升级提示
+│
+├── 📁 Repository/
+│   ├── AutoSyncManager.swift           ✓ 已存在
+│   ├── CloudKitRepository.swift        ✓ 已存在
+│   ├── CloudKitSyncManager.swift       ✓ 已存在
+│   ├── DataRepository.swift            ✓ 已存在
+│   ├── DatabaseManager.swift           ✓ 已存在
+│   ├── SQLiteRepository.swift          ✓ 已存在
+│   └── UserDefaultsRepository.swift    ✓ 已存在
+│
+├── 📁 ExpenseTracker/
+│   ├── ExpenseTrackerApp.swift         📝 需修改 - 添加订阅管理
+│   ├── ExpenseTracker.entitlements     ✅ 已更新 - 添加 IAP 权限
+│   └── 📁 Assets.xcassets/             ✓ 已存在
+│
+├── Products.storekit                   ✨ 新增 - StoreKit 测试配置
+│
+└── 📁 文档/
+    ├── IAP_README.md                   📖 项目总览
+    ├── QUICK_START.md                  📖 快速开始（推荐先看）
+    ├── IAP_INTEGRATION_PATCHES.md      📖 代码修改补丁（必读）
+    ├── INTEGRATION_GUIDE.md            📖 完整集成指南
+    ├── IAP_ARCHITECTURE.md             📖 架构设计文档
+    ├── IAP_IMPLEMENTATION_SUMMARY.md   📖 实现总结
+    ├── CHECKLIST.md                    📖 集成检查清单
+    ├── 完成总结.md                      📖 本次实现总结
+    └── FILE_TREE.txt                   📖 本文件
+
+图例说明
+========
+✨ 新增 - 需要添加到 Xcode 项目的新文件
+📝 需修改 - 需要按照补丁文档修改的现有文件
+✓ 已存在 - 不需要修改的现有文件
+✅ 已更新 - 已经更新过的文件
+📖 文档 - 参考文档
+
+统计信息
+========
+新增代码文件: 7 个
+需修改文件: 7 个
+新增文档: 8 个
+配置文件: 2 个
+
+快速开始
+========
+1. 阅读: 完成总结.md 或 QUICK_START.md
+2. 添加: 7 个新文件到 Xcode
+3. 修改: 按 IAP_INTEGRATION_PATCHES.md 修改 7 个文件
+4. 配置: StoreKit Configuration
+5. 测试: 运行并验证功能
+
+预计时间: 20 分钟

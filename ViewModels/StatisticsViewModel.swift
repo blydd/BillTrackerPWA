@@ -62,10 +62,6 @@ class StatisticsViewModel: ObservableObject {
                     continue
                 }
                 
-                // 获取账单的交易类型
-                let transactionType = paymentMethod.transactionType
-                let amount = abs(bill.amount)
-                
                 // 检查账单类型是否为"不计入"
                 let billCategories = bill.categoryIds.compactMap { categoryId in
                     categories.first(where: { $0.id == categoryId })
@@ -73,6 +69,19 @@ class StatisticsViewModel: ObservableObject {
                 
                 // 如果账单的所有类型都是不计入，则在总览中排除 (Requirement 8.5)
                 let isExcluded = !billCategories.isEmpty && billCategories.allSatisfy { $0.transactionType == .excluded }
+                
+                // 根据账单金额判断实际的交易类型
+                // 正数 = 收入，负数 = 支出，不计入类型单独处理
+                let actualTransactionType: TransactionType
+                if isExcluded {
+                    actualTransactionType = .excluded
+                } else if bill.amount > 0 {
+                    actualTransactionType = .income
+                } else {
+                    actualTransactionType = .expense
+                }
+                
+                let amount = abs(bill.amount)
                 
                 if !isExcluded {
                     // 计算总收入和总支出
@@ -90,7 +99,7 @@ class StatisticsViewModel: ObservableObject {
                         if catStats[categoryName] == nil {
                             catStats[categoryName] = [:]
                         }
-                        catStats[categoryName]?[transactionType, default: 0] += amount
+                        catStats[categoryName]?[actualTransactionType, default: 0] += amount
                     }
                 }
                 
@@ -99,14 +108,14 @@ class StatisticsViewModel: ObservableObject {
                     if ownStats[ownerName] == nil {
                         ownStats[ownerName] = [:]
                     }
-                    ownStats[ownerName]?[transactionType, default: 0] += amount
+                    ownStats[ownerName]?[actualTransactionType, default: 0] += amount
                 }
                 
                 // 按支付方式统计 (Requirement 8.4)
                 if pmStats[paymentMethod.name] == nil {
                     pmStats[paymentMethod.name] = [:]
                 }
-                pmStats[paymentMethod.name]?[transactionType, default: 0] += amount
+                pmStats[paymentMethod.name]?[actualTransactionType, default: 0] += amount
             }
             
             // 更新发布的属性

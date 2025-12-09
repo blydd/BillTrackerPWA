@@ -11,6 +11,12 @@
 		8DBA37912EE6BA76007FBEA5 /* CloudKitRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8DBA378E2EE6BA76007FBEA5 /* CloudKitRepository.swift */; };
 		8DBA37922EE6BA76007FBEA5 /* CloudKitSyncManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8DBA378F2EE6BA76007FBEA5 /* CloudKitSyncManager.swift */; };
 		8DBA37942EE6BA8B007FBEA5 /* CloudSyncSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8DBA37932EE6BA8B007FBEA5 /* CloudSyncSettingsView.swift */; };
+		8DBA37982EE85CC2007FBEA5 /* SubscriptionTier.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8DBA37972EE85CC2007FBEA5 /* SubscriptionTier.swift */; };
+		8DBA379C2EE85CED007FBEA5 /* PurchaseView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8DBA379A2EE85CED007FBEA5 /* PurchaseView.swift */; };
+		8DBA379D2EE85CED007FBEA5 /* UpgradePromptView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8DBA379B2EE85CED007FBEA5 /* UpgradePromptView.swift */; };
+		8DBA379E2EE85CED007FBEA5 /* DatabaseExportView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8DBA37992EE85CED007FBEA5 /* DatabaseExportView.swift */; };
+		8DBA37AD2EE8605B007FBEA5 /* IAPManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8DBA37AA2EE8605B007FBEA5 /* IAPManager.swift */; };
+		8DBA37AE2EE8605B007FBEA5 /* SubscriptionManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8DBA37AB2EE8605B007FBEA5 /* SubscriptionManager.swift */; };
 		8DC61B4E2ED985360043BB28 /* AppError.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8DC61B2F2ED985360043BB28 /* AppError.swift */; };
 		8DC61B4F2ED985360043BB28 /* ErrorHandlingExampleView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8DC61B472ED985360043BB28 /* ErrorHandlingExampleView.swift */; };
 		8DC61B502ED985360043BB28 /* Bill.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8DC61B302ED985360043BB28 /* Bill.swift */; };
@@ -53,6 +59,13 @@
 		8DBA378E2EE6BA76007FBEA5 /* CloudKitRepository.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CloudKitRepository.swift; sourceTree = "<group>"; };
 		8DBA378F2EE6BA76007FBEA5 /* CloudKitSyncManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CloudKitSyncManager.swift; sourceTree = "<group>"; };
 		8DBA37932EE6BA8B007FBEA5 /* CloudSyncSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CloudSyncSettingsView.swift; sourceTree = "<group>"; };
+		8DBA37972EE85CC2007FBEA5 /* SubscriptionTier.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SubscriptionTier.swift; sourceTree = "<group>"; };
+		8DBA37992EE85CED007FBEA5 /* DatabaseExportView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DatabaseExportView.swift; sourceTree = "<group>"; };
+		8DBA379A2EE85CED007FBEA5 /* PurchaseView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PurchaseView.swift; sourceTree = "<group>"; };
+		8DBA379B2EE85CED007FBEA5 /* UpgradePromptView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UpgradePromptView.swift; sourceTree = "<group>"; };
+		8DBA379F2EE85DC6007FBEA5 /* Products.storekit */ = {isa = PBXFileReference; lastKnownFileType = text; path = Products.storekit; sourceTree = "<group>"; };
+		8DBA37AA2EE8605B007FBEA5 /* IAPManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IAPManager.swift; sourceTree = "<group>"; };
+		8DBA37AB2EE8605B007FBEA5 /* SubscriptionManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SubscriptionManager.swift; sourceTree = "<group>"; };
 		8DC61B1F2ED984D20043BB28 /* ExpenseTracker.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = ExpenseTracker.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		8DC61B2E2ED985360043BB28 /* AccountType.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AccountType.swift; sourceTree = "<group>"; };
 		8DC61B2F2ED985360043BB28 /* AppError.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppError.swift; sourceTree = "<group>"; };
@@ -111,15 +124,26 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		8DBA37AC2EE8605B007FBEA5 /* Services */ = {
+			isa = PBXGroup;
+			children = (
+				8DBA37AA2EE8605B007FBEA5 /* IAPManager.swift */,
+				8DBA37AB2EE8605B007FBEA5 /* SubscriptionManager.swift */,
+			);
+			path = Services;
+			sourceTree = "<group>";
+		};
 		8DC61B162ED984D20043BB28 = {
 			isa = PBXGroup;
 			children = (
+				8DBA379F2EE85DC6007FBEA5 /* Products.storekit */,
 				8DC61B352ED985360043BB28 /* Models */,
 				8DC61B382ED985360043BB28 /* Repository */,
 				8DC61B3F2ED985360043BB28 /* ViewModels */,
 				8DC61B4D2ED985360043BB28 /* Views */,
 				8DC61B212ED984D20043BB28 /* ExpenseTracker */,
 				8DC61B202ED984D20043BB28 /* Products */,
+				8DBA37AC2EE8605B007FBEA5 /* Services */,
 			);
 			sourceTree = "<group>";
 		};
@@ -134,6 +158,7 @@
 		8DC61B352ED985360043BB28 /* Models */ = {
 			isa = PBXGroup;
 			children = (
+				8DBA37972EE85CC2007FBEA5 /* SubscriptionTier.swift */,
 				8DC61B2E2ED985360043BB28 /* AccountType.swift */,
 				8DC61B2F2ED985360043BB28 /* AppError.swift */,
 				8DC61B302ED985360043BB28 /* Bill.swift */,
@@ -177,6 +202,9 @@
 		8DC61B4D2ED985360043BB28 /* Views */ = {
 			isa = PBXGroup;
 			children = (
+				8DBA37992EE85CED007FBEA5 /* DatabaseExportView.swift */,
+				8DBA379A2EE85CED007FBEA5 /* PurchaseView.swift */,
+				8DBA379B2EE85CED007FBEA5 /* UpgradePromptView.swift */,
 				8DBA37932EE6BA8B007FBEA5 /* CloudSyncSettingsView.swift */,
 				8DC61B7B2EE023330043BB28 /* DatabaseInfoView.swift */,
 				8DC61B752EE004D90043BB28 /* PieChartView.swift */,
@@ -281,6 +309,8 @@
 				8DC61B532ED985360043BB28 /* StatisticsView.swift in Sources */,
 				8DC61B542ED985360043BB28 /* OwnerViewModel.swift in Sources */,
 				8DC61B552ED985360043BB28 /* ErrorAlertModifier.swift in Sources */,
+				8DBA37AD2EE8605B007FBEA5 /* IAPManager.swift in Sources */,
+				8DBA37AE2EE8605B007FBEA5 /* SubscriptionManager.swift in Sources */,
 				8DC61B562ED985360043BB28 /* EmptyStateView.swift in Sources */,
 				8DC61B572ED985360043BB28 /* PaymentMethodViewModel.swift in Sources */,
 				8DC61B742EE004CB0043BB28 /* ChartStatisticsView.swift in Sources */,
@@ -302,11 +332,15 @@
 				8DC61B702EDDE66C0043BB28 /* InitializationView.swift in Sources */,
 				8DC61B762EE004D90043BB28 /* PieChartView.swift in Sources */,
 				8DC61B632ED985360043BB28 /* PaymentMethod.swift in Sources */,
+				8DBA379C2EE85CED007FBEA5 /* PurchaseView.swift in Sources */,
+				8DBA379D2EE85CED007FBEA5 /* UpgradePromptView.swift in Sources */,
+				8DBA379E2EE85CED007FBEA5 /* DatabaseExportView.swift in Sources */,
 				8DC61B642ED985360043BB28 /* BillViewModel.swift in Sources */,
 				8DC61B652ED985360043BB28 /* BillListView.swift in Sources */,
 				8DC61B662ED985360043BB28 /* DataRepository.swift in Sources */,
 				8DC61B672ED985360043BB28 /* UserDefaultsRepository.swift in Sources */,
 				8DBA37942EE6BA8B007FBEA5 /* CloudSyncSettingsView.swift in Sources */,
+				8DBA37982EE85CC2007FBEA5 /* SubscriptionTier.swift in Sources */,
 				8DC61B682ED985360043BB28 /* StatisticsViewModel.swift in Sources */,
 				8DBA37902EE6BA76007FBEA5 /* AutoSyncManager.swift in Sources */,
 				8DBA37912EE6BA76007FBEA5 /* CloudKitRepository.swift in Sources */,
@@ -461,7 +495,7 @@
 					"@executable_path/Frameworks",
 				);
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.bgt.TagBill20251201;
+				PRODUCT_BUNDLE_IDENTIFIER = com.bgt.TagBill;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
@@ -497,7 +531,7 @@
 					"@executable_path/Frameworks",
 				);
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.bgt.TagBill20251201;
+				PRODUCT_BUNDLE_IDENTIFIER = com.bgt.TagBill;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;

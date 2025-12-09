@@ -4,6 +4,7 @@ import SwiftUI
 struct BillFormView: View {
     @Environment(\.dismiss) private var dismiss
     @StateObject private var billViewModel: BillViewModel
+    @StateObject private var subscriptionManager = SubscriptionManager.shared
     
     let categories: [BillCategory]
     let owners: [Owner]
@@ -18,9 +19,9 @@ struct BillFormView: View {
     @State private var selectedOwnerId: UUID?
     @State private var note = ""
     @State private var selectedDate = Date()
-    @State private var showingDatePicker = false
     @State private var showingError = false
     @State private var errorMessage = ""
+    @State private var showingUpgradePrompt = false
     @FocusState private var isAmountFocused: Bool
     
     init(repository: DataRepository,
@@ -83,18 +84,9 @@ struct BillFormView: View {
                             }
                         }
                         
-                        HStack {
-                            Text("日期")
-                            Spacer()
-                            Text(formattedDate)
-                                .foregroundColor(.secondary)
-                        }
-                        .contentShape(Rectangle())
-                        .onTapGesture {
-                            showingDatePicker = true
-                        }
-                        
-                        DatePicker("时间", selection: $selectedDate, displayedComponents: [.hourAndMinute])
+                        // 日期和时间合并在一个格子里
+                        DatePicker("日期时间", selection: $selectedDate, displayedComponents: [.date, .hourAndMinute])
+                            .datePickerStyle(.compact)
                     }
                     
                     // 归属人标签选择（放在最前面）
@@ -252,31 +244,13 @@ struct BillFormView: View {
                     }
                 }
             }
-            .sheet(isPresented: $showingDatePicker) {
-                NavigationView {
-                    DatePicker("选择日期", selection: $selectedDate, displayedComponents: [.date])
-                        .datePickerStyle(.graphical)
-                        .padding()
-                        .navigationTitle("选择日期")
-                        .navigationBarTitleDisplayMode(.inline)
-                        .toolbar {
-                            ToolbarItem(placement: .confirmationAction) {
-                                Button("完成") {
-                                    showingDatePicker = false
-                                }
-                            }
-                        }
-                }
-                .presentationDetents([.medium])
-            }
+            .upgradePrompt(
+                isPresented: $showingUpgradePrompt,
+                title: "已达到账单上限",
+                message: "免费版最多支持 500 条账单记录\n升级到 Pro 版解锁无限账单",
+                feature: "unlimited_bills"
+            )
         }
-    }
-    
-    /// 格式化日期为 yyyy-MM-dd
-    private var formattedDate: String {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "yyyy-MM-dd"
-        return formatter.string(from: selectedDate)
     }
     
     // 根据选中的交易类型和归属人过滤支付方式
@@ -368,6 +342,15 @@ struct BillFormView: View {
     }
     
     private func saveBill() async {
+        // 检查账单数量限制（仅在创建新账单时检查）
+        if editingBill == nil {
+            let currentCount = billViewModel.bills.count
+            if !subscriptionManager.canCreateBill(currentBillCount: currentCount) {
+                showingUpgradePrompt = true
+                return
+            }
+        }
+        
         guard var amountValue = Decimal(string: amount),
               let paymentMethodId = selectedPaymentMethodId,
               let ownerId = selectedOwnerId else {

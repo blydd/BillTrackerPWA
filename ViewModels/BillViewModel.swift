@@ -231,17 +231,18 @@ class BillViewModel: ObservableObject {
             }
             
             // 信贷方式：
-            // 正数：还款，减少欠费，增加可用额度
+            // 正数：还款，减少欠费，增加可用额度（允许溢缴款，欠费可以为负数）
             // 负数：消费，增加欠费，减少可用额度
             let newBalance = creditMethod.outstandingBalance - amount
             
-            // 检查是否超过信用额度
+            // 检查是否超过信用额度（只在消费时检查，还款不限制）
+            // 可用额度 = 信用额度 - 欠费，当欠费为负数时，可用额度会超过信用额度
             if newBalance > creditMethod.creditLimit {
                 throw AppError.creditLimitExceeded
             }
             
-            // 确保欠费不为负数
-            creditMethod.outstandingBalance = max(0, newBalance)
+            // 允许欠费为负数（溢缴款）
+            creditMethod.outstandingBalance = newBalance
             updatedMethod = .credit(creditMethod)
             
         case .savings(var savingsMethod):
@@ -397,33 +398,91 @@ class BillViewModel: ObservableObject {
     /// - Throws: AppError 如果删除失败
     /// - Requirements: 9.4
     func deleteBill(_ bill: Bill) async throws {
+        print("🗑️ 开始删除账单: ID=\(bill.id), 金额=\(bill.amount)")
+        
         // 获取支付方式
         guard let paymentMethod = try await repository.fetchPaymentMethod(by: bill.paymentMethodId) else {
+            print("❌ 删除失败: 找不到支付方式")
             throw AppError.missingPaymentMethod
         }
         
+        print("💳 支付方式: \(paymentMethod.name), 类型: \(paymentMethod.transactionType)")
+        
         // 恢复支付方式余额（如果不是"不计入"类型）
         if paymentMethod.transactionType != .excluded {
+            print("💰 恢复余额: -\(bill.amount)")
             try await updatePaymentMethodBalance(
                 paymentMethod: paymentMethod,
                 amount: -bill.amount,
                 isCreating: false,
                 billOwnerId: bill.ownerId
             )
+        } else {
+            print("⚠️ 不计入类型，需要手动恢复余额")
+            // 对于不计入类型，也需要恢复余额
+            var updatedMethod = paymentMethod
+            
+            switch paymentMethod {
+            case .credit(var creditMethod):
+                // 验证归属人
+                guard creditMethod.ownerId == bill.ownerId else {
+                    print("❌ 归属人不匹配")
+                    throw AppError.ownerMismatch
+                }
+                
+                // 恢复余额：删除账单时，需要反向操作
+                // 如果原来是还款（正数），删除后欠费应该增加
+                // 如果原来是消费（负数），删除后欠费应该减少
+                creditMethod.outstandingBalance += bill.amount
+                updatedMethod = .credit(creditMethod)
+                
+            case .savings(var savingsMethod):
+                // 验证归属人
+                guard savingsMethod.ownerId == bill.ownerId else {
+                    print("❌ 归属人不匹配")
+                    throw AppError.ownerMismatch
+                }
+                
+                // 恢复余额：删除账单时，需要反向操作
+                savingsMethod.balance -= bill.amount
+                updatedMethod = .savings(savingsMethod)
+            }
+            
+            try await repository.updatePaymentMethod(updatedMethod)
+            print("✅ 不计入类型余额恢复完成")
         }
         
         do {
+            print("🗄️ 从数据库删除账单...")
             try await repository.deleteBill(bill)
+            print("✅ 数据库删除成功")
+            
+            print("📝 从内存列表删除账单...")
             bills.removeAll { $0.id == bill.id }
+            print("✅ 内存删除成功，当前账单数: \(bills.count)")
         } catch {
+            print("❌ 删除失败: \(error)")
             // 如果删除失败，回滚余额
             if paymentMethod.transactionType != .excluded {
+                print("🔄 回滚余额...")
                 try? await updatePaymentMethodBalance(
                     paymentMethod: paymentMethod,
                     amount: bill.amount,
                     isCreating: false,
                     billOwnerId: bill.ownerId
                 )
+            } else {
+                // 回滚不计入类型的余额
+                var rollbackMethod = paymentMethod
+                switch paymentMethod {
+                case .credit(var creditMethod):
+                    creditMethod.outstandingBalance -= bill.amount
+                    rollbackMethod = .credit(creditMethod)
+                case .savings(var savingsMethod):
+                    savingsMethod.balance += bill.amount
+                    rollbackMethod = .savings(savingsMethod)
+                }
+                try? await repository.updatePaymentMethod(rollbackMethod)
             }
             throw AppError.persistenceError(underlying: error)
         }
@@ -459,19 +518,21 @@ class BillViewModel: ObservableObject {
             // 信贷方式余额更新逻辑
             // 金额为负数表示支出，正数表示收入
             // 支出（负数）：增加欠费
-            // 收入（正数）：减少欠费
+            // 收入（正数）：减少欠费（允许溢缴款，欠费可以为负数）
             let oldBalance = creditMethod.outstandingBalance
             let newBalance = creditMethod.outstandingBalance - amount
             
             print("  信贷: 旧欠费=\(oldBalance), 新欠费=\(newBalance)")
             
             // 检查是否超过信用额度 (Requirement 6.2)
+            // 只在消费（欠费增加）时检查，还款不限制
             if newBalance > creditMethod.creditLimit {
                 print("❌ 超过信用额度")
                 throw AppError.creditLimitExceeded
             }
             
-            creditMethod.outstandingBalance = max(0, newBalance)
+            // 允许欠费为负数（溢缴款）
+            creditMethod.outstandingBalance = newBalance
             updatedMethod = .credit(creditMethod)
             
         case .savings(var savingsMethod):

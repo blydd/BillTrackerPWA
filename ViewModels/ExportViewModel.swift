@@ -31,6 +31,11 @@ class ExportViewModel: ObservableObject {
         owners: [Owner],
         paymentMethods: [PaymentMethodWrapper]
     ) async throws -> URL {
+        // 检查导出权限
+        guard SubscriptionManager.shared.canExportData else {
+            throw AppError.featureNotAvailable
+        }
+        
         isExporting = true
         exportProgress = 0.0
         errorMessage = nil

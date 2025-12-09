@@ -14,6 +14,8 @@ enum AppError: Error, LocalizedError {
     case ownerMismatch
     case persistenceError(underlying: Error)
     case exportError(underlying: Error)
+    case billLimitReached
+    case featureNotAvailable
     
     var errorDescription: String? {
         switch self {
@@ -41,6 +43,10 @@ enum AppError: Error, LocalizedError {
             return "数据保存失败: \(error.localizedDescription)"
         case .exportError(let error):
             return "导出失败: \(error.localizedDescription)"
+        case .billLimitReached:
+            return "已达到免费版账单上限（500条）"
+        case .featureNotAvailable:
+            return "此功能仅限 Pro 用户使用"
         }
     }
 }

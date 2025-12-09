@@ -318,18 +318,34 @@ class SQLiteRepository: DataRepository {
     }
     
     func deleteBill(_ bill: Bill) async throws {
+        print("🗄️ SQLite: 删除账单 ID=\(bill.id)")
+        
         let deleteSQL = "DELETE FROM bills WHERE id = ?;"
         
         var statement: OpaquePointer?
         guard sqlite3_prepare_v2(db, deleteSQL, -1, &statement, nil) == SQLITE_OK else {
+            let errorMessage = String(cString: sqlite3_errmsg(db))
+            print("❌ SQLite: 准备删除语句失败: \(errorMessage)")
             throw SQLiteError.prepareFailed
         }
         defer { sqlite3_finalize(statement) }
         
-        sqlite3_bind_text(statement, 1, bill.id.uuidString, -1, nil)
+        bill.id.uuidString.withCString { idPtr in
+            sqlite3_bind_text(statement, 1, idPtr, -1, unsafeBitCast(-1, to: sqlite3_destructor_type.self))
+        }
         
-        guard sqlite3_step(statement) == SQLITE_DONE else {
+        let result = sqlite3_step(statement)
+        if result != SQLITE_DONE {
+            let errorMessage = String(cString: sqlite3_errmsg(db))
+            print("❌ SQLite: 删除失败: \(errorMessage), 错误码: \(result)")
             throw SQLiteError.executeFailed
+        }
+        
+        let changes = sqlite3_changes(db)
+        print("✅ SQLite: 删除成功，影响行数: \(changes)")
+        
+        if changes == 0 {
+            print("⚠️ SQLite: 警告 - 没有行被删除，账单可能不存在")
         }
     }
     
