@@ -71,7 +71,7 @@ struct UpgradePromptModifier: ViewModifier {
                     message: message,
                     feature: feature
                 )
-                .presentationDetents([.medium])
+                .iOS16PresentationCompat()
             }
     }
 }

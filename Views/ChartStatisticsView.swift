@@ -145,8 +145,7 @@ struct ChartStatisticsView: View {
                     startDate: $startDate,
                     endDate: $endDate
                 )
-                .presentationDetents([.medium])
-                .presentationDragIndicator(.hidden)
+                .iOS16PresentationWithDragCompat()
             }
         }
     }
@@ -383,13 +382,13 @@ struct ChartDatePickerSheet: View {
                 )
                 .datePickerStyle(.graphical)
                 .padding()
-                .onChange(of: selectedDate) { oldValue, newValue in
+                .onChange(of: selectedDate) { newValue in
                     // 只有当日期真正改变时才关闭
                     let calendar = Calendar.current
-                    let oldDay = calendar.startOfDay(for: oldValue)
+                    let initialDay = calendar.startOfDay(for: initialDate)
                     let newDay = calendar.startOfDay(for: newValue)
                     
-                    if oldDay != newDay {
+                    if initialDay != newDay {
                         // 延迟一点关闭，让用户看到选中效果
                         DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
                             dismiss()

@@ -93,7 +93,7 @@ struct BillListView: View {
                     }
                     
                     if isFilterExpanded {
-                        FlowLayout(spacing: 8) {
+                        LazyVGrid(columns: [GridItem(.adaptive(minimum: 80))], spacing: 8) {
                             // 归属人筛选标签
                             ForEach(Array(selectedOwnerIds), id: \.self) { ownerId in
                                 if let owner = ownerViewModel.owners.first(where: { $0.id == ownerId }) {
@@ -341,8 +341,7 @@ struct BillListView: View {
                 startDate: $startDate,
                 endDate: $endDate
             )
-            .presentationDetents([.medium, .large])
-            .presentationDragIndicator(.hidden)
+            .iOS16PresentationLargeCompat()
         }
         .task {
             await loadData()
@@ -885,7 +884,7 @@ struct BillRowView: View {
                     categories.first(where: { $0.id == id })
                 }
                 
-                FlowLayout(spacing: 4) {
+                LazyVGrid(columns: [GridItem(.adaptive(minimum: 60))], spacing: 4) {
                     // 归属人标签
                     if let owner = owners.first(where: { $0.id == bill.ownerId }) {
                         CompactTagView(
@@ -1266,7 +1265,7 @@ struct FilterSheetView: View {
                             .font(.headline)
                             .padding(.horizontal)
                         
-                        FlowLayout(spacing: 8) {
+                        LazyVGrid(columns: [GridItem(.adaptive(minimum: 80))], spacing: 8) {
                             ForEach(owners) { owner in
                                 SelectableFilterTag(
                                     text: owner.name,
@@ -1294,7 +1293,7 @@ struct FilterSheetView: View {
                                     .padding(.horizontal)
                                     .padding(.top, 8)
                                 
-                                FlowLayout(spacing: 8) {
+                                LazyVGrid(columns: [GridItem(.adaptive(minimum: 100))], spacing: 8) {
                                     ForEach(filteredPaymentMethods, id: \.id) { method in
                                         SelectableFilterTag(
                                             text: displayPaymentMethodName(method.name),
@@ -1322,7 +1321,7 @@ struct FilterSheetView: View {
                             .font(.headline)
                             .padding(.horizontal)
                         
-                        FlowLayout(spacing: 8) {
+                        LazyVGrid(columns: [GridItem(.adaptive(minimum: 80))], spacing: 8) {
                             ForEach(categories) { category in
                                 SelectableFilterTag(
                                     text: category.name,
@@ -1493,13 +1492,13 @@ struct DatePickerSheet: View {
                 )
                 .datePickerStyle(.graphical)
                 .padding()
-                .onChange(of: selectedDate) { oldValue, newValue in
+                .onChange(of: selectedDate) { newValue in
                     // 只有当日期真正改变时才关闭（排除初始化时的触发）
                     let calendar = Calendar.current
-                    let oldDay = calendar.startOfDay(for: oldValue)
+                    let initialDay = calendar.startOfDay(for: initialDate)
                     let newDay = calendar.startOfDay(for: newValue)
                     
-                    if oldDay != newDay {
+                    if initialDay != newDay {
                         // 延迟一点关闭，让用户看到选中效果
                         DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
                             dismiss()

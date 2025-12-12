@@ -1,5 +1,40 @@
 import SwiftUI
 
+// MARK: - iOS 16 兼容性扩展
+
+extension View {
+    /// 应用 iOS 16 兼容的弹窗展示修饰符
+    func iOS16PresentationCompat() -> some View {
+        if #available(iOS 16.0, *) {
+            return AnyView(self.presentationDetents([.medium]))
+        } else {
+            return AnyView(self)
+        }
+    }
+    
+    /// 应用 iOS 16 兼容的大尺寸弹窗展示修饰符
+    func iOS16PresentationLargeCompat() -> some View {
+        if #available(iOS 16.0, *) {
+            return AnyView(self
+                .presentationDetents([.medium, .large])
+                .presentationDragIndicator(.hidden))
+        } else {
+            return AnyView(self)
+        }
+    }
+    
+    /// 应用 iOS 16 兼容的带拖拽指示器隐藏的弹窗展示修饰符
+    func iOS16PresentationWithDragCompat() -> some View {
+        if #available(iOS 16.0, *) {
+            return AnyView(self
+                .presentationDetents([.medium])
+                .presentationDragIndicator(.hidden))
+        } else {
+            return AnyView(self)
+        }
+    }
+}
+
 /// 账单表单视图
 struct BillFormView: View {
     @Environment(\.dismiss) private var dismiss
@@ -106,7 +141,7 @@ struct BillFormView: View {
                                     selectedOwnerId = nil
                                 }
                             } else {
-                                FlowLayout(spacing: 8) {
+                                LazyVGrid(columns: [GridItem(.adaptive(minimum: 80))], spacing: 8) {
                                     ForEach(owners) { owner in
                                         SelectableTagView(
                                             text: owner.name,
@@ -144,7 +179,7 @@ struct BillFormView: View {
                                         selectedPaymentMethodId = nil
                                     }
                                 } else {
-                                    FlowLayout(spacing: 8) {
+                                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 100))], spacing: 8) {
                                         ForEach(filteredPaymentMethods, id: \.id) { method in
                                             SelectableTagView(
                                                 text: displayPaymentMethodName(method.name),
@@ -175,7 +210,7 @@ struct BillFormView: View {
                             } else {
                                 // 已选中的标签
                                 if !selectedCategoryIds.isEmpty {
-                                    FlowLayout(spacing: 8) {
+                                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 80))], spacing: 8) {
                                         ForEach(filteredCategories.filter { selectedCategoryIds.contains($0.id) }) { category in
                                             SelectableTagView(
                                                 text: category.name,
@@ -189,7 +224,7 @@ struct BillFormView: View {
                                 }
                                 
                                 // 未选中的标签
-                                FlowLayout(spacing: 8) {
+                                LazyVGrid(columns: [GridItem(.adaptive(minimum: 80))], spacing: 8) {
                                     ForEach(filteredCategories.filter { !selectedCategoryIds.contains($0.id) }) { category in
                                         SelectableTagView(
                                             text: category.name,
@@ -472,54 +507,4 @@ struct SelectableTagView: View {
     }
 }
 
-// MARK: - 流式布局
-struct FlowLayout: Layout {
-    var spacing: CGFloat = 8
-    
-    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
-        let result = FlowResult(
-            in: proposal.replacingUnspecifiedDimensions().width,
-            subviews: subviews,
-            spacing: spacing
-        )
-        return result.size
-    }
-    
-    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
-        let result = FlowResult(
-            in: bounds.width,
-            subviews: subviews,
-            spacing: spacing
-        )
-        for (index, subview) in subviews.enumerated() {
-            subview.place(at: CGPoint(x: bounds.minX + result.positions[index].x, y: bounds.minY + result.positions[index].y), proposal: .unspecified)
-        }
-    }
-    
-    struct FlowResult {
-        var size: CGSize = .zero
-        var positions: [CGPoint] = []
-        
-        init(in maxWidth: CGFloat, subviews: Subviews, spacing: CGFloat) {
-            var currentX: CGFloat = 0
-            var currentY: CGFloat = 0
-            var lineHeight: CGFloat = 0
-            
-            for subview in subviews {
-                let size = subview.sizeThatFits(.unspecified)
-                
-                if currentX + size.width > maxWidth && currentX > 0 {
-                    currentX = 0
-                    currentY += lineHeight + spacing
-                    lineHeight = 0
-                }
-                
-                positions.append(CGPoint(x: currentX, y: currentY))
-                lineHeight = max(lineHeight, size.height)
-                currentX += size.width + spacing
-            }
-            
-            self.size = CGSize(width: maxWidth, height: currentY + lineHeight)
-        }
-    }
-}
+
