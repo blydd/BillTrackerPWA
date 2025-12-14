@@ -630,11 +630,21 @@ class SQLiteRepository: DataRepository {
         }
         defer { sqlite3_finalize(statement) }
         
-        sqlite3_bind_text(statement, 1, method.id.uuidString, -1, nil)
+        method.id.uuidString.withCString { idPtr in
+            sqlite3_bind_text(statement, 1, idPtr, -1, unsafeBitCast(-1, to: sqlite3_destructor_type.self))
+        }
         
         guard sqlite3_step(statement) == SQLITE_DONE else {
             throw SQLiteError.executeFailed
         }
+        
+        // 检查是否真的删除了记录
+        let changes = sqlite3_changes(db)
+        if changes == 0 {
+            throw SQLiteError.notFound
+        }
+        
+        print("✅ 成功删除支付方式，ID: \(method.id), 影响行数: \(changes)")
     }
     
     func fetchPaymentMethod(by id: UUID) async throws -> PaymentMethodWrapper? {
@@ -689,6 +699,60 @@ class SQLiteRepository: DataRepository {
         }
         
         return nil
+    }
+    
+    // MARK: - Specific PaymentMethod Delete Operations
+    
+    func deleteCreditMethod(id: UUID) async throws {
+        let deleteSQL = "DELETE FROM payment_methods WHERE id = ? AND account_type = 'credit';"
+        
+        var statement: OpaquePointer?
+        guard sqlite3_prepare_v2(db, deleteSQL, -1, &statement, nil) == SQLITE_OK else {
+            throw SQLiteError.prepareFailed
+        }
+        defer { sqlite3_finalize(statement) }
+        
+        id.uuidString.withCString { idPtr in
+            sqlite3_bind_text(statement, 1, idPtr, -1, unsafeBitCast(-1, to: sqlite3_destructor_type.self))
+        }
+        
+        guard sqlite3_step(statement) == SQLITE_DONE else {
+            throw SQLiteError.executeFailed
+        }
+        
+        // 检查是否真的删除了记录
+        let changes = sqlite3_changes(db)
+        if changes == 0 {
+            throw SQLiteError.notFound
+        }
+        
+        print("✅ 成功删除信贷方式，ID: \(id)")
+    }
+    
+    func deleteSavingsMethod(id: UUID) async throws {
+        let deleteSQL = "DELETE FROM payment_methods WHERE id = ? AND account_type = 'savings';"
+        
+        var statement: OpaquePointer?
+        guard sqlite3_prepare_v2(db, deleteSQL, -1, &statement, nil) == SQLITE_OK else {
+            throw SQLiteError.prepareFailed
+        }
+        defer { sqlite3_finalize(statement) }
+        
+        id.uuidString.withCString { idPtr in
+            sqlite3_bind_text(statement, 1, idPtr, -1, unsafeBitCast(-1, to: sqlite3_destructor_type.self))
+        }
+        
+        guard sqlite3_step(statement) == SQLITE_DONE else {
+            throw SQLiteError.executeFailed
+        }
+        
+        // 检查是否真的删除了记录
+        let changes = sqlite3_changes(db)
+        if changes == 0 {
+            throw SQLiteError.notFound
+        }
+        
+        print("✅ 成功删除储蓄方式，ID: \(id)")
     }
     
     // MARK: - Category Operations
@@ -790,11 +854,21 @@ class SQLiteRepository: DataRepository {
         }
         defer { sqlite3_finalize(statement) }
         
-        sqlite3_bind_text(statement, 1, category.id.uuidString, -1, nil)
+        category.id.uuidString.withCString { idPtr in
+            sqlite3_bind_text(statement, 1, idPtr, -1, unsafeBitCast(-1, to: sqlite3_destructor_type.self))
+        }
         
         guard sqlite3_step(statement) == SQLITE_DONE else {
             throw SQLiteError.executeFailed
         }
+        
+        // 检查是否真的删除了记录
+        let changes = sqlite3_changes(db)
+        if changes == 0 {
+            throw SQLiteError.notFound
+        }
+        
+        print("✅ 成功删除分类，ID: \(category.id), 影响行数: \(changes)")
     }
     
     func fetchCategory(by id: UUID) async throws -> BillCategory? {
@@ -909,11 +983,21 @@ class SQLiteRepository: DataRepository {
         }
         defer { sqlite3_finalize(statement) }
         
-        sqlite3_bind_text(statement, 1, owner.id.uuidString, -1, nil)
+        owner.id.uuidString.withCString { idPtr in
+            sqlite3_bind_text(statement, 1, idPtr, -1, unsafeBitCast(-1, to: sqlite3_destructor_type.self))
+        }
         
         guard sqlite3_step(statement) == SQLITE_DONE else {
             throw SQLiteError.executeFailed
         }
+        
+        // 检查是否真的删除了记录
+        let changes = sqlite3_changes(db)
+        if changes == 0 {
+            throw SQLiteError.notFound
+        }
+        
+        print("✅ 成功删除归属人，ID: \(owner.id), 影响行数: \(changes)")
     }
     
     func fetchOwner(by id: UUID) async throws -> Owner? {

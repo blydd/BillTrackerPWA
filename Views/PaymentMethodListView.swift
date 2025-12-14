@@ -28,6 +28,10 @@ struct PaymentMethodListView: View {
     @State private var savingsName = ""
     @State private var savingsBalance = ""
     
+    // 删除确认相关状态
+    @State private var showingDeleteAlert = false
+    @State private var methodToDelete: (id: UUID, name: String, type: AccountType)?
+    
     init(repository: DataRepository) {
         self.repository = repository
         _viewModel = StateObject(wrappedValue: PaymentMethodViewModel(repository: repository))
@@ -91,6 +95,8 @@ struct PaymentMethodListView: View {
                                     .foregroundColor(.green)
                             }
                             Spacer()
+                            
+                            // 编辑按钮
                             Button("编辑") {
                                 editingCreditMethod = method
                                 creditName = method.name
@@ -101,9 +107,20 @@ struct PaymentMethodListView: View {
                                 showingEditCreditSheet = true
                             }
                             .buttonStyle(.borderless)
+                            
+                            // 删除按钮
+                            Button {
+                                methodToDelete = (id: method.id, name: method.name, type: .credit)
+                                showingDeleteAlert = true
+                            } label: {
+                                Image(systemName: "trash")
+                                    .foregroundColor(.red)
+                            }
+                            .buttonStyle(.borderless)
                         }
                         .padding(.vertical, 4)
                     }
+                    .onDelete(perform: deleteCreditMethods)
                 } else {
                     ForEach(filteredSavingsMethods, id: \.id) { method in
                         HStack {
@@ -115,6 +132,8 @@ struct PaymentMethodListView: View {
                                     .foregroundColor(.secondary)
                             }
                             Spacer()
+                            
+                            // 编辑按钮
                             Button("编辑") {
                                 editingSavingsMethod = method
                                 savingsName = method.name
@@ -123,9 +142,20 @@ struct PaymentMethodListView: View {
                                 showingEditSavingsSheet = true
                             }
                             .buttonStyle(.borderless)
+                            
+                            // 删除按钮
+                            Button {
+                                methodToDelete = (id: method.id, name: method.name, type: .savings)
+                                showingDeleteAlert = true
+                            } label: {
+                                Image(systemName: "trash")
+                                    .foregroundColor(.red)
+                            }
+                            .buttonStyle(.borderless)
                         }
                         .padding(.vertical, 4)
                     }
+                    .onDelete(perform: deleteSavingsMethods)
                 }
             }
         }
@@ -154,6 +184,18 @@ struct PaymentMethodListView: View {
         }
         .sheet(isPresented: $showingEditSavingsSheet) {
             editSavingsMethodSheet
+        }
+        .alert("确认删除", isPresented: $showingDeleteAlert) {
+            Button("取消", role: .cancel) { }
+            Button("删除", role: .destructive) {
+                if let method = methodToDelete {
+                    deletePaymentMethod(id: method.id, type: method.type)
+                }
+            }
+        } message: {
+            if let method = methodToDelete {
+                Text("确定要删除支付方式「" + method.name + "」吗？\n\n注意：删除后相关的账单记录不会被删除，但会失去与此支付方式的关联。")
+            }
         }
         .alert("错误", isPresented: $showingError) {
             Button("确定", role: .cancel) {}
@@ -465,5 +507,48 @@ struct PaymentMethodListView: View {
         formatter.minimumFractionDigits = 2
         formatter.maximumFractionDigits = 2
         return formatter
+    }
+    
+    // MARK: - 删除方法
+    
+    /// 删除支付方式
+    private func deletePaymentMethod(id: UUID, type: AccountType) {
+        Task {
+            do {
+                switch type {
+                case .credit:
+                    try await viewModel.deleteCreditMethod(id: id)
+                case .savings:
+                    try await viewModel.deleteSavingsMethod(id: id)
+                }
+                
+                // 重新加载数据
+                await viewModel.loadPaymentMethods()
+                
+            } catch {
+                print("删除支付方式失败: \(error)")
+                showingError = true
+            }
+        }
+    }
+    
+    /// 滑动删除信贷方式
+    private func deleteCreditMethods(offsets: IndexSet) {
+        for index in offsets {
+            let method = filteredCreditMethods[index]
+            methodToDelete = (id: method.id, name: method.name, type: .credit)
+            showingDeleteAlert = true
+            break // 一次只处理一个
+        }
+    }
+    
+    /// 滑动删除储蓄方式
+    private func deleteSavingsMethods(offsets: IndexSet) {
+        for index in offsets {
+            let method = filteredSavingsMethods[index]
+            methodToDelete = (id: method.id, name: method.name, type: .savings)
+            showingDeleteAlert = true
+            break // 一次只处理一个
+        }
     }
 }

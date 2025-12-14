@@ -67,34 +67,40 @@ struct InitializationView: View {
                 }
                 
                 DisclosureGroup("归属人") {
-                    Text("男主、女主、公主、少主")
+                    Text("男主、女主")
                         .font(.caption)
                         .padding(.vertical, 4)
                 }
                 
                 DisclosureGroup("支付方式") {
                     VStack(alignment: .leading, spacing: 8) {
-                        HStack {
-                            Text("信贷:")
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("男主信贷方式:")
                                 .font(.caption)
+                                .fontWeight(.medium)
+                                .foregroundColor(.blue)
+                            Text("青岛信用卡(4万/15日)、广发信用卡(5.8万/9日)、浦发信用卡(5.1万/10日)、齐鲁信用卡(3万/15日)、兴业信用卡(2.4万/22日)、平安信用卡(7万/7日)、华夏信用卡(4.6万/8日)、交通信用卡(1.4万/11日)、招商信用卡(6万/9日)、光大信用卡(3.8万/1日)、中信信用卡(8.7万/20日)、农行信用卡(2.1万/28日)、白条(4.3万/1日)、花呗(5.86万/1日)")
+                                .font(.caption2)
                                 .foregroundColor(.secondary)
-                            Text("花呗、白条、招商信用卡、广发信用卡、兴业信用卡、农行信用卡、光大信用卡")
-                                .font(.caption)
                         }
-                        Text("(初始额度: 10000, 无欠费)")
-                            .font(.caption2)
-                            .foregroundColor(.secondary)
+                        
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("女主信贷方式:")
+                                .font(.caption)
+                                .fontWeight(.medium)
+                                .foregroundColor(.pink)
+                            Text("广发信用卡(3.4万/18日)、齐鲁信用卡(3.2万/15日)、平安信用卡(5.8万/3日)、建设信用卡(1万/26日)、招商信用卡(3.3万/17日)、光大信用卡(2万/15日)、中信信用卡(8.7万/2日)、交通信用卡(4.8万/11日)、白条(2万/1日)、花呗(2.13万/1日)")
+                                .font(.caption2)
+                                .foregroundColor(.secondary)
+                        }
                         
                         HStack {
-                            Text("储蓄:")
+                            Text("储蓄方式:")
                                 .font(.caption)
                                 .foregroundColor(.secondary)
-                            Text("微信零钱、余额宝")
+                            Text("微信零钱、余额宝 (初始余额: 0)")
                                 .font(.caption)
                         }
-                        Text("(初始余额: 0)")
-                            .font(.caption2)
-                            .foregroundColor(.secondary)
                     }
                     .padding(.vertical, 4)
                 }

@@ -130,7 +130,7 @@ class InitializationViewModel: ObservableObject {
     
     /// 初始化归属人
     private func initializeOwners() async throws {
-        let ownerNames = ["男主", "女主", "公主", "少主"]
+        let ownerNames = ["男主", "女主"]
         
         for name in ownerNames {
             let owner = Owner(name: name)
@@ -153,37 +153,76 @@ class InitializationViewModel: ObservableObject {
         
         print("✅ 找到男主: \(maleOwner.id), 女主: \(femaleOwner.id)")
         
-        // 为"男主"和"女主"各创建一套支付方式
-        let targetOwners = [maleOwner, femaleOwner]
+        // 为男主创建信贷方式
+        print("🔄 为男主创建信贷方式...")
+        let maleCreditMethods = [
+            ("青岛信用卡", 40000, 15),
+            ("广发信用卡", 58000, 9),
+            ("浦发信用卡", 51000, 10),
+            ("齐鲁信用卡", 30000, 15),
+            ("兴业信用卡", 24000, 22),
+            ("平安信用卡", 70000, 7),
+            ("华夏信用卡", 46000, 8),
+            ("交通信用卡", 14000, 11),
+            ("招商信用卡", 60000, 9),
+            ("光大信用卡", 38000, 1),
+            ("中信信用卡", 87000, 20),
+            ("农行信用卡", 21000, 28),
+            ("白条", 43046, 1),
+            ("花呗", 58600, 1)
+        ]
         
+        for (name, limit, billingDate) in maleCreditMethods {
+            let method = CreditMethod(
+                name: name,
+                transactionType: .expense,
+                creditLimit: Decimal(limit),
+                outstandingBalance: 0,
+                billingDate: billingDate,
+                ownerId: maleOwner.id
+            )
+            print("  💳 保存男主信贷: \(method.name), 额度: \(limit), 账单日: \(billingDate)")
+            try await repository.savePaymentMethod(.credit(method))
+        }
+        
+        // 为女主创建信贷方式
+        print("🔄 为女主创建信贷方式...")
+        let femaleCreditMethods = [
+            ("广发信用卡", 34000, 18),
+            ("齐鲁信用卡", 32000, 15),
+            ("平安信用卡", 58000, 3),
+            ("建设信用卡", 10000, 26),
+            ("招商信用卡", 33000, 17),
+            ("光大信用卡", 20000, 15),
+            ("中信信用卡", 87000, 2),
+            ("交通信用卡", 48000, 11),
+            ("白条", 19993, 1),
+            ("花呗", 21300, 1)
+        ]
+        
+        for (name, limit, billingDate) in femaleCreditMethods {
+            let method = CreditMethod(
+                name: name,
+                transactionType: .expense,
+                creditLimit: Decimal(limit),
+                outstandingBalance: 0,
+                billingDate: billingDate,
+                ownerId: femaleOwner.id
+            )
+            print("  💳 保存女主信贷: \(method.name), 额度: \(limit), 账单日: \(billingDate)")
+            try await repository.savePaymentMethod(.credit(method))
+        }
+        
+        // 为男主和女主各创建储蓄方式
+        let targetOwners = [maleOwner, femaleOwner]
         for owner in targetOwners {
-            print("🔄 为 \(owner.name) 创建支付方式...")
+            print("🔄 为 \(owner.name) 创建储蓄方式...")
             
-            // 信贷方式
-            let creditMethods = [
-                "花呗", "白条", "招商信用卡", "广发信用卡",
-                "兴业信用卡", "农行信用卡", "光大信用卡"
-            ]
-            
-            for name in creditMethods {
-                let method = CreditMethod(
-                    name: "\(owner.name)-\(name)",
-                    transactionType: .expense,
-                    creditLimit: 10000,
-                    outstandingBalance: 0,
-                    billingDate: 1,
-                    ownerId: owner.id
-                )
-                print("  💳 保存信贷: \(method.name)")
-                try await repository.savePaymentMethod(.credit(method))
-            }
-            
-            // 储蓄方式
             let savingsMethods = ["微信零钱", "余额宝"]
             
             for name in savingsMethods {
                 let method = SavingsMethod(
-                    name: "\(owner.name)-\(name)",
+                    name: name,
                     transactionType: .expense,
                     balance: 0,
                     ownerId: owner.id

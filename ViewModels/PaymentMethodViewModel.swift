@@ -291,4 +291,40 @@ class PaymentMethodViewModel: ObservableObject {
     func availableCredit(for creditMethod: CreditMethod) -> Decimal {
         return creditMethod.creditLimit - creditMethod.outstandingBalance
     }
+    
+    // MARK: - Delete Operations
+    
+    /// 删除信贷方式
+    /// - Parameter id: 信贷方式ID
+    func deleteCreditMethod(id: UUID) async throws {
+        isLoading = true
+        errorMessage = nil
+        
+        do {
+            try await repository.deleteCreditMethod(id: id)
+            await loadPaymentMethods()
+        } catch {
+            errorMessage = "删除信贷方式失败: \(error.localizedDescription)"
+            throw error
+        }
+        
+        isLoading = false
+    }
+    
+    /// 删除储蓄方式
+    /// - Parameter id: 储蓄方式ID
+    func deleteSavingsMethod(id: UUID) async throws {
+        isLoading = true
+        errorMessage = nil
+        
+        do {
+            try await repository.deleteSavingsMethod(id: id)
+            await loadPaymentMethods()
+        } catch {
+            errorMessage = "删除储蓄方式失败: \(error.localizedDescription)"
+            throw error
+        }
+        
+        isLoading = false
+    }
 }

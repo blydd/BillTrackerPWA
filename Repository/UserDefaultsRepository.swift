@@ -108,6 +108,40 @@ class UserDefaultsRepository: DataRepository {
         return methods.first { $0.id == id }
     }
     
+    // MARK: - Specific PaymentMethod Delete Operations
+    
+    func deleteCreditMethod(id: UUID) async throws {
+        var methods = try await fetchPaymentMethods()
+        guard let index = methods.firstIndex(where: { $0.id == id }) else {
+            throw RepositoryError.notFound
+        }
+        
+        // 确保是信贷方式
+        switch methods[index] {
+        case .credit:
+            methods.remove(at: index)
+            try savePaymentMethods(methods)
+        case .savings:
+            throw RepositoryError.notFound // 不是信贷方式
+        }
+    }
+    
+    func deleteSavingsMethod(id: UUID) async throws {
+        var methods = try await fetchPaymentMethods()
+        guard let index = methods.firstIndex(where: { $0.id == id }) else {
+            throw RepositoryError.notFound
+        }
+        
+        // 确保是储蓄方式
+        switch methods[index] {
+        case .savings:
+            methods.remove(at: index)
+            try savePaymentMethods(methods)
+        case .credit:
+            throw RepositoryError.notFound // 不是储蓄方式
+        }
+    }
+    
     private func savePaymentMethods(_ methods: [PaymentMethodWrapper]) throws {
         do {
             let data = try JSONEncoder().encode(methods)

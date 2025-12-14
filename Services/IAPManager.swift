@@ -16,8 +16,8 @@ enum IAPProduct: String, CaseIterable {
     
     var displayPrice: String {
         switch self {
-        case .annualSubscription: return "¥12/年"
-        case .lifetimePurchase: return "¥38"
+        case .annualSubscription: return "¥18/年"
+        case .lifetimePurchase: return "¥43"
         }
     }
     
@@ -60,10 +60,27 @@ class IAPManager: NSObject, ObservableObject {
         
         do {
             let productIDs = IAPProduct.allCases.map { $0.rawValue }
+            print("🔍 尝试加载产品 IDs: \(productIDs)")
+            
             products = try await Product.products(for: productIDs)
-            print("✅ 加载了 \(products.count) 个产品")
+            
+            print("✅ 成功加载了 \(products.count) 个产品")
+            for product in products {
+                print("📦 产品: \(product.id) - \(product.displayName) - \(product.displayPrice)")
+            }
+            
+            // 检查缺失的产品
+            let loadedIDs = Set(products.map { $0.id })
+            let requestedIDs = Set(productIDs)
+            let missingIDs = requestedIDs.subtracting(loadedIDs)
+            
+            if !missingIDs.isEmpty {
+                print("⚠️ 未找到的产品: \(missingIDs)")
+                errorMessage = "测试模式：部分产品未在 StoreKit 配置中找到"
+            }
+            
         } catch {
-            errorMessage = "加载产品失败: \(error.localizedDescription)"
+            errorMessage = "产品加载失败: \(error.localizedDescription)"
             print("❌ 加载产品失败: \(error)")
         }
         

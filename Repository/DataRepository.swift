@@ -16,6 +16,10 @@ protocol DataRepository {
     func deletePaymentMethod(_ method: PaymentMethodWrapper) async throws
     func fetchPaymentMethod(by id: UUID) async throws -> PaymentMethodWrapper?
     
+    // Specific PaymentMethod delete operations
+    func deleteCreditMethod(id: UUID) async throws
+    func deleteSavingsMethod(id: UUID) async throws
+    
     // BillCategory CRUD operations
     func saveCategory(_ category: BillCategory) async throws
     func fetchCategories() async throws -> [BillCategory]

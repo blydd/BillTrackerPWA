@@ -156,6 +156,14 @@ struct PurchaseView: View {
                     ) {
                         await purchaseProduct(lifetimeProduct)
                     }
+                } else {
+                    // 备用显示 - 终身买断
+                    StaticPurchaseCard(
+                        title: "终身买断",
+                        price: "¥43",
+                        subtitle: "一次购买，永久使用",
+                        badge: "推荐"
+                    )
                 }
                 
                 // 年订阅
@@ -169,7 +177,52 @@ struct PurchaseView: View {
                     ) {
                         await purchaseProduct(annualProduct)
                     }
+                } else {
+                    // 备用显示 - 年订阅
+                    StaticPurchaseCard(
+                        title: "年订阅",
+                        price: "¥18/年",
+                        subtitle: "自动续订，随时取消",
+                        badge: nil
+                    )
                 }
+            }
+            
+            // 调试信息
+            if iapManager.products.isEmpty && !iapManager.isLoading {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("🧪 当前为测试模式")
+                        .font(.caption)
+                        .foregroundColor(.orange)
+                    
+                    Text("• StoreKit 配置文件可能未正确加载")
+                        .font(.caption2)
+                        .foregroundColor(.secondary)
+                    
+                    Text("• 真实购买需要在 App Store Connect 中配置产品")
+                        .font(.caption2)
+                        .foregroundColor(.secondary)
+                }
+                .padding(.top, 8)
+            }
+            
+            // 产品加载状态
+            if iapManager.isLoading {
+                HStack {
+                    ProgressView()
+                        .scaleEffect(0.8)
+                    Text("正在加载产品...")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+            }
+            
+            // 错误信息
+            if let error = iapManager.errorMessage {
+                Text("⚠️ \(error)")
+                    .font(.caption)
+                    .foregroundColor(.red)
+                    .padding(.top, 8)
             }
         }
     }
@@ -293,6 +346,78 @@ struct PurchaseOptionCard: View {
         }
         .buttonStyle(.plain)
         .disabled(isLoading)
+    }
+}
+
+// MARK: - 静态购买卡片（备用显示）
+
+struct StaticPurchaseCard: View {
+    let title: String
+    let price: String
+    let subtitle: String
+    let badge: String?
+    
+    @State private var showingTestAlert = false
+    
+    var body: some View {
+        Button {
+            showingTestAlert = true
+        } label: {
+            VStack(alignment: .leading, spacing: 12) {
+                HStack {
+                    VStack(alignment: .leading, spacing: 4) {
+                        HStack {
+                            Text(title)
+                                .font(.headline)
+                                .foregroundColor(.primary)
+                            
+                            if let badge = badge {
+                                Text(badge)
+                                    .font(.caption)
+                                    .fontWeight(.medium)
+                                    .padding(.horizontal, 8)
+                                    .padding(.vertical, 2)
+                                    .background(Color.blue)
+                                    .foregroundColor(.white)
+                                    .cornerRadius(4)
+                            }
+                        }
+                        
+                        Text(subtitle)
+                            .font(.subheadline)
+                            .foregroundColor(.secondary)
+                    }
+                    
+                    Spacer()
+                    
+                    Text(price)
+                        .font(.title2)
+                        .fontWeight(.semibold)
+                        .foregroundColor(.blue)
+                }
+                
+                HStack {
+                    Image(systemName: "flask")
+                        .foregroundColor(.orange)
+                    Text("测试模式 - 点击查看说明")
+                        .font(.caption)
+                        .foregroundColor(.orange)
+                }
+            }
+            .padding()
+            .background(Color(.systemGray6))
+            .cornerRadius(12)
+            .overlay(
+                RoundedRectangle(cornerRadius: 12)
+                    .stroke(Color.orange.opacity(0.3), lineWidth: 1)
+            )
+        }
+        .buttonStyle(.plain)
+        .alert("测试模式说明", isPresented: $showingTestAlert) {
+            Button("了解", role: .cancel) { }
+        } message: {
+            Text("当前为开发测试模式。真实的购买功能需要：\n\n1. 付费 Apple Developer 账户\n2. 在 App Store Connect 中配置产品\n3. 通过 TestFlight 或 App Store 分发\n\n价格：\(title) - \(price)")
+        }
     }
 }
 
