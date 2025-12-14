@@ -232,7 +232,13 @@ struct PaymentMethodListView: View {
     private var addCreditMethodSheet: some View {
         NavigationView {
             Form {
-                TextField("名称", text: $creditName)
+                HStack {
+                    Text("名称")
+                        .foregroundColor(.primary)
+                    Spacer()
+                    TextField("请输入名称", text: $creditName)
+                        .multilineTextAlignment(.trailing)
+                }
                 
                 Picker("归属人", selection: $selectedOwnerId) {
                     Text("请选择").tag(nil as UUID?)
@@ -241,12 +247,32 @@ struct PaymentMethodListView: View {
                     }
                 }
                 
-                TextField("信用额度", text: $creditLimit)
-                    .keyboardType(.decimalPad)
-                TextField("初始欠费", text: $outstandingBalance)
-                    .keyboardType(.decimalPad)
-                TextField("账单日", text: $billingDate)
-                    .keyboardType(.numberPad)
+                HStack {
+                    Text("信用额度")
+                        .foregroundColor(.primary)
+                    Spacer()
+                    TextField("0", text: $creditLimit)
+                        .keyboardType(.decimalPad)
+                        .multilineTextAlignment(.trailing)
+                }
+                
+                HStack {
+                    Text("初始欠费")
+                        .foregroundColor(.primary)
+                    Spacer()
+                    TextField("0", text: $outstandingBalance)
+                        .keyboardType(.decimalPad)
+                        .multilineTextAlignment(.trailing)
+                }
+                
+                HStack {
+                    Text("账单日")
+                        .foregroundColor(.primary)
+                    Spacer()
+                    TextField("1", text: $billingDate)
+                        .keyboardType(.numberPad)
+                        .multilineTextAlignment(.trailing)
+                }
             }
             .navigationTitle("添加信贷方式")
             .navigationBarTitleDisplayMode(.inline)
@@ -270,7 +296,13 @@ struct PaymentMethodListView: View {
     private var addSavingsMethodSheet: some View {
         NavigationView {
             Form {
-                TextField("名称", text: $savingsName)
+                HStack {
+                    Text("名称")
+                        .foregroundColor(.primary)
+                    Spacer()
+                    TextField("请输入名称", text: $savingsName)
+                        .multilineTextAlignment(.trailing)
+                }
                 
                 Picker("归属人", selection: $selectedOwnerId) {
                     Text("请选择").tag(nil as UUID?)
@@ -279,8 +311,14 @@ struct PaymentMethodListView: View {
                     }
                 }
                 
-                TextField("初始余额", text: $savingsBalance)
-                    .keyboardType(.decimalPad)
+                HStack {
+                    Text("初始余额")
+                        .foregroundColor(.primary)
+                    Spacer()
+                    TextField("0", text: $savingsBalance)
+                        .keyboardType(.decimalPad)
+                        .multilineTextAlignment(.trailing)
+                }
             }
             .navigationTitle("添加储蓄方式")
             .navigationBarTitleDisplayMode(.inline)
@@ -365,7 +403,13 @@ struct PaymentMethodListView: View {
     private var editCreditMethodSheet: some View {
         NavigationView {
             Form {
-                TextField("名称", text: $creditName)
+                HStack {
+                    Text("名称")
+                        .foregroundColor(.primary)
+                    Spacer()
+                    TextField("请输入名称", text: $creditName)
+                        .multilineTextAlignment(.trailing)
+                }
                 
                 Picker("归属人", selection: $selectedOwnerId) {
                     Text("请选择").tag(nil as UUID?)
@@ -374,12 +418,32 @@ struct PaymentMethodListView: View {
                     }
                 }
                 
-                TextField("信用额度", text: $creditLimit)
-                    .keyboardType(.decimalPad)
-                TextField("当前欠费", text: $outstandingBalance)
-                    .keyboardType(.decimalPad)
-                TextField("账单日", text: $billingDate)
-                    .keyboardType(.numberPad)
+                HStack {
+                    Text("信用额度")
+                        .foregroundColor(.primary)
+                    Spacer()
+                    TextField("0", text: $creditLimit)
+                        .keyboardType(.decimalPad)
+                        .multilineTextAlignment(.trailing)
+                }
+                
+                HStack {
+                    Text("当前欠费")
+                        .foregroundColor(.primary)
+                    Spacer()
+                    TextField("0", text: $outstandingBalance)
+                        .keyboardType(.decimalPad)
+                        .multilineTextAlignment(.trailing)
+                }
+                
+                HStack {
+                    Text("账单日")
+                        .foregroundColor(.primary)
+                    Spacer()
+                    TextField("1", text: $billingDate)
+                        .keyboardType(.numberPad)
+                        .multilineTextAlignment(.trailing)
+                }
             }
             .navigationTitle("编辑信贷方式")
             .navigationBarTitleDisplayMode(.inline)
@@ -405,7 +469,13 @@ struct PaymentMethodListView: View {
     private var editSavingsMethodSheet: some View {
         NavigationView {
             Form {
-                TextField("名称", text: $savingsName)
+                HStack {
+                    Text("名称")
+                        .foregroundColor(.primary)
+                    Spacer()
+                    TextField("请输入名称", text: $savingsName)
+                        .multilineTextAlignment(.trailing)
+                }
                 
                 Picker("归属人", selection: $selectedOwnerId) {
                     Text("请选择").tag(nil as UUID?)
@@ -414,8 +484,14 @@ struct PaymentMethodListView: View {
                     }
                 }
                 
-                TextField("当前余额", text: $savingsBalance)
-                    .keyboardType(.decimalPad)
+                HStack {
+                    Text("当前余额")
+                        .foregroundColor(.primary)
+                    Spacer()
+                    TextField("0", text: $savingsBalance)
+                        .keyboardType(.decimalPad)
+                        .multilineTextAlignment(.trailing)
+                }
             }
             .navigationTitle("编辑储蓄方式")
             .navigationBarTitleDisplayMode(.inline)
