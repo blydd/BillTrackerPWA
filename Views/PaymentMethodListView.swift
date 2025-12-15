@@ -72,6 +72,11 @@ struct PaymentMethodListView: View {
                 .padding(.vertical, 8)
             }
             
+            // 统计信息显示
+            if let selectedOwnerId = selectedOwnerIdForFilter {
+                statisticsView(for: selectedOwnerId)
+            }
+            
             List {
                 if selectedTab == .credit {
                     ForEach(filteredCreditMethods, id: \.id) { method in
@@ -625,6 +630,114 @@ struct PaymentMethodListView: View {
             methodToDelete = (id: method.id, name: method.name, type: .savings)
             showingDeleteAlert = true
             break // 一次只处理一个
+        }
+    }
+    
+    // MARK: - 统计信息视图
+    
+    /// 为指定归属人显示统计信息
+    @ViewBuilder
+    private func statisticsView(for ownerId: UUID) -> some View {
+        if selectedTab == .credit {
+            creditStatisticsView(for: ownerId)
+        } else {
+            savingsStatisticsView(for: ownerId)
+        }
+    }
+    
+    /// 信贷方式统计视图
+    @ViewBuilder
+    private func creditStatisticsView(for ownerId: UUID) -> some View {
+        let ownerCreditMethods = viewModel.creditMethods.filter { $0.ownerId == ownerId }
+        
+        if !ownerCreditMethods.isEmpty {
+            let totalLimit = ownerCreditMethods.reduce(Decimal.zero) { $0 + $1.creditLimit }
+            let totalOutstanding = ownerCreditMethods.reduce(Decimal.zero) { $0 + $1.outstandingBalance }
+            let totalAvailable = totalLimit - totalOutstanding
+            
+            VStack(spacing: 8) {
+                HStack {
+                    Text("信贷方式统计")
+                        .font(.headline)
+                        .foregroundColor(.primary)
+                    Spacer()
+                }
+                
+                HStack(spacing: 20) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("总额度")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                        Text("¥\(totalLimit as NSDecimalNumber, formatter: numberFormatter)")
+                            .font(.subheadline)
+                            .fontWeight(.medium)
+                            .foregroundColor(.blue)
+                    }
+                    
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("总欠费")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                        Text("¥\(totalOutstanding as NSDecimalNumber, formatter: numberFormatter)")
+                            .font(.subheadline)
+                            .fontWeight(.medium)
+                            .foregroundColor(.red)
+                    }
+                    
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("总可用")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                        Text("¥\(totalAvailable as NSDecimalNumber, formatter: numberFormatter)")
+                            .font(.subheadline)
+                            .fontWeight(.medium)
+                            .foregroundColor(.green)
+                    }
+                    
+                    Spacer()
+                }
+            }
+            .padding()
+            .background(Color.gray.opacity(0.1))
+            .cornerRadius(12)
+            .padding(.horizontal)
+        }
+    }
+    
+    /// 储蓄方式统计视图
+    @ViewBuilder
+    private func savingsStatisticsView(for ownerId: UUID) -> some View {
+        let ownerSavingsMethods = viewModel.savingsMethods.filter { $0.ownerId == ownerId }
+        
+        if !ownerSavingsMethods.isEmpty {
+            let totalBalance = ownerSavingsMethods.reduce(Decimal.zero) { $0 + $1.balance }
+            
+            VStack(spacing: 8) {
+                HStack {
+                    Text("储蓄方式统计")
+                        .font(.headline)
+                        .foregroundColor(.primary)
+                    Spacer()
+                }
+                
+                HStack {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("总余额")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                        Text("¥\(totalBalance as NSDecimalNumber, formatter: numberFormatter)")
+                            .font(.subheadline)
+                            .fontWeight(.medium)
+                            .foregroundColor(.green)
+                    }
+                    
+                    Spacer()
+                }
+            }
+            .padding()
+            .background(Color.gray.opacity(0.1))
+            .cornerRadius(12)
+            .padding(.horizontal)
         }
     }
 }
