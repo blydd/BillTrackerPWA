@@ -152,7 +152,7 @@ struct BillFormView: View {
                                     selectedOwnerId = nil
                                 }
                             } else {
-                                LazyVGrid(columns: [GridItem(.adaptive(minimum: 80))], spacing: 8) {
+                                FlowLayoutView(spacing: 8) {
                                     ForEach(owners) { owner in
                                         SelectableTagView(
                                             text: owner.name,
@@ -192,7 +192,7 @@ struct BillFormView: View {
                                         selectedPaymentMethodId = nil
                                     }
                                 } else {
-                                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 100))], spacing: 8) {
+                                    FlowLayoutView(spacing: 8) {
                                         ForEach(filteredPaymentMethods, id: \.id) { method in
                                             SelectableTagView(
                                                 text: displayPaymentMethodName(method.name),
@@ -224,7 +224,7 @@ struct BillFormView: View {
                             } else {
                                 // 已选中的标签
                                 if !selectedCategoryIds.isEmpty {
-                                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 80))], spacing: 8) {
+                                    FlowLayoutView(spacing: 8) {
                                         ForEach(filteredCategories.filter { selectedCategoryIds.contains($0.id) }) { category in
                                             SelectableTagView(
                                                 text: category.name,
@@ -239,7 +239,7 @@ struct BillFormView: View {
                                 }
                                 
                                 // 未选中的标签
-                                LazyVGrid(columns: [GridItem(.adaptive(minimum: 80))], spacing: 8) {
+                                FlowLayoutView(spacing: 8) {
                                     ForEach(filteredCategories.filter { !selectedCategoryIds.contains($0.id) }) { category in
                                         SelectableTagView(
                                             text: category.name,
@@ -578,6 +578,29 @@ struct SelectableTagView: View {
             )
         }
         .buttonStyle(.plain)
+    }
+}
+
+// MARK: - iOS 15 兼容的紧凑布局
+struct FlowLayoutView<Content: View>: View {
+    let spacing: CGFloat
+    let content: Content
+    
+    init(spacing: CGFloat = 8, @ViewBuilder content: () -> Content) {
+        self.spacing = spacing
+        self.content = content()
+    }
+    
+    var body: some View {
+        // 使用更紧凑的 LazyVGrid 配置
+        LazyVGrid(
+            columns: [
+                GridItem(.adaptive(minimum: 50, maximum: 150), spacing: spacing)
+            ],
+            spacing: spacing
+        ) {
+            content
+        }
     }
 }
 
