@@ -16,8 +16,8 @@ enum IAPProduct: String, CaseIterable {
     
     var displayPrice: String {
         switch self {
-        case .annualSubscription: return "¥18/年"
-        case .lifetimePurchase: return "¥43"
+        case .annualSubscription: return "¥12/年"
+        case .lifetimePurchase: return "¥40"
         }
     }
     
