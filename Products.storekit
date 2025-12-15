@@ -23,7 +23,8 @@
   "settings" : {
     "_applicationInternalID" : "6738492800",
     "_developerTeamID" : "YOUR_TEAM_ID",
-    "_lastSynchronizedDate" : 755827200.0
+    "_lastSynchronizedDate" : 755827200.0,
+    "_storefront" : "CHN"
   },
   "subscriptionGroups" : [
     {

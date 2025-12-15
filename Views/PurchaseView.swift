@@ -160,7 +160,7 @@ struct PurchaseView: View {
                     // 备用显示 - 终身买断
                     StaticPurchaseCard(
                         title: "终身买断",
-                        price: "¥43",
+                        price: "¥40",
                         subtitle: "一次购买，永久使用",
                         badge: "推荐"
                     )
@@ -181,7 +181,7 @@ struct PurchaseView: View {
                     // 备用显示 - 年订阅
                     StaticPurchaseCard(
                         title: "年订阅",
-                        price: "¥18/年",
+                        price: "¥12/年",
                         subtitle: "自动续订，随时取消",
                         badge: nil
                     )
