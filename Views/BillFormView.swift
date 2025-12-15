@@ -57,7 +57,9 @@ struct BillFormView: View {
     @State private var showingError = false
     @State private var errorMessage = ""
     @State private var showingUpgradePrompt = false
+    @State private var showingDatePicker = false
     @FocusState private var isAmountFocused: Bool
+    @FocusState private var isNoteFocused: Bool
     
     init(repository: DataRepository,
          categories: [BillCategory],
@@ -85,7 +87,8 @@ struct BillFormView: View {
                 .pickerStyle(.segmented)
                 .padding()
                 .onChange(of: selectedTransactionType) { _ in
-                    // 切换Tab时清空选择
+                    // 切换Tab时清空选择并隐藏键盘
+                    hideKeyboard()
                     selectedPaymentMethodId = nil
                     selectedCategoryIds.removeAll()
                 }
@@ -103,13 +106,9 @@ struct BillFormView: View {
                             TextField("金额", text: $amount)
                                 .keyboardType(selectedTransactionType == .excluded ? .numbersAndPunctuation : .decimalPad)
                                 .focused($isAmountFocused)
-                                .toolbar {
-                                    ToolbarItemGroup(placement: .keyboard) {
-                                        Spacer()
-                                        Button("完成") {
-                                            isAmountFocused = false
-                                        }
-                                    }
+                                .onSubmit {
+                                    // 输入完成后隐藏键盘
+                                    isAmountFocused = false
                                 }
                             
                             if selectedTransactionType == .excluded {
@@ -119,9 +118,20 @@ struct BillFormView: View {
                             }
                         }
                         
-                        // 日期和时间合并在一个格子里
-                        DatePicker("日期时间", selection: $selectedDate, displayedComponents: [.date, .hourAndMinute])
-                            .datePickerStyle(.compact)
+                        // 自定义日期时间选择
+                        Button(action: {
+                            hideKeyboard()
+                            showingDatePicker = true
+                        }) {
+                            HStack {
+                                Text("日期时间")
+                                    .foregroundColor(.primary)
+                                Spacer()
+                                Text(formatDate(selectedDate))
+                                    .foregroundColor(.secondary)
+                            }
+                        }
+                        .buttonStyle(.plain)
                     }
                     
                     // 归属人标签选择（放在最前面）
@@ -138,6 +148,7 @@ struct BillFormView: View {
                                     isSelected: true,
                                     color: .green
                                 ) {
+                                    hideKeyboard()
                                     selectedOwnerId = nil
                                 }
                             } else {
@@ -148,6 +159,7 @@ struct BillFormView: View {
                                             isSelected: false,
                                             color: .green
                                         ) {
+                                            hideKeyboard()
                                             selectedOwnerId = owner.id
                                         }
                                     }
@@ -176,6 +188,7 @@ struct BillFormView: View {
                                         isSelected: true,
                                         color: .blue
                                     ) {
+                                        hideKeyboard()
                                         selectedPaymentMethodId = nil
                                     }
                                 } else {
@@ -186,6 +199,7 @@ struct BillFormView: View {
                                                 isSelected: false,
                                                 color: .blue
                                             ) {
+                                                hideKeyboard()
                                                 selectedPaymentMethodId = method.id
                                             }
                                         }
@@ -217,6 +231,7 @@ struct BillFormView: View {
                                                 isSelected: true,
                                                 color: .orange
                                             ) {
+                                                hideKeyboard()
                                                 selectedCategoryIds.remove(category.id)
                                             }
                                         }
@@ -231,6 +246,7 @@ struct BillFormView: View {
                                             isSelected: false,
                                             color: .orange
                                         ) {
+                                            hideKeyboard()
                                             selectedCategoryIds.insert(category.id)
                                         }
                                     }
@@ -243,6 +259,7 @@ struct BillFormView: View {
                     Section("备注") {
                         TextEditor(text: $note)
                             .frame(height: 100)
+                            .focused($isNoteFocused)
                     }
                 }
             }
@@ -262,6 +279,18 @@ struct BillFormView: View {
                     }
                     .disabled(!isFormValid)
                 }
+                
+                // 键盘工具栏
+                ToolbarItemGroup(placement: .keyboard) {
+                    Spacer()
+                    Button("完成") {
+                        hideKeyboard()
+                    }
+                }
+            }
+            .onTapGesture {
+                // 点击空白区域隐藏键盘
+                hideKeyboard()
             }
             .alert("错误", isPresented: $showingError) {
                 Button("确定", role: .cancel) {}
@@ -285,6 +314,34 @@ struct BillFormView: View {
                 message: "免费版最多支持 500 条账单记录\n升级到 Pro 版解锁无限账单",
                 feature: "unlimited_bills"
             )
+            .sheet(isPresented: $showingDatePicker) {
+                NavigationView {
+                    VStack {
+                        DatePicker("选择日期时间", selection: $selectedDate, displayedComponents: [.date, .hourAndMinute])
+                            .datePickerStyle(.wheel)
+                            .labelsHidden()
+                            .environment(\.locale, Locale(identifier: "zh_CN"))
+                        
+                        Spacer()
+                    }
+                    .padding()
+                    .navigationTitle("选择日期时间")
+                    .navigationBarTitleDisplayMode(.inline)
+                    .toolbar {
+                        ToolbarItem(placement: .cancellationAction) {
+                            Button("取消") {
+                                showingDatePicker = false
+                            }
+                        }
+                        ToolbarItem(placement: .confirmationAction) {
+                            Button("确定") {
+                                showingDatePicker = false
+                            }
+                        }
+                    }
+                }
+                .iOS16PresentationCompat()
+            }
         }
     }
     
@@ -472,6 +529,23 @@ struct BillFormView: View {
         if let paymentMethod = paymentMethods.first(where: { $0.id == bill.paymentMethodId }) {
             selectedTransactionType = paymentMethod.transactionType
         }
+    }
+    
+    /// 隐藏键盘
+    private func hideKeyboard() {
+        isAmountFocused = false
+        isNoteFocused = false
+        
+        // 强制隐藏键盘的备用方法
+        UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
+    }
+    
+    /// 格式化日期显示
+    private func formatDate(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "zh_CN")
+        formatter.dateFormat = "yyyy年MM月dd日 HH:mm"
+        return formatter.string(from: date)
     }
 }
 
