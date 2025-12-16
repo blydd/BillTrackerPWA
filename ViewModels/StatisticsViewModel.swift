@@ -29,6 +29,13 @@ class StatisticsViewModel: ObservableObject {
         isLoading = true
         errorMessage = nil
         
+        // 重置统计数据以防出错
+        totalIncome = 0
+        totalExpense = 0
+        categoryStatistics = [:]
+        ownerStatistics = [:]
+        paymentMethodStatistics = [:]
+        
         do {
             // 获取所有数据
             var bills = try await repository.fetchBills()
@@ -112,10 +119,15 @@ class StatisticsViewModel: ObservableObject {
                 }
                 
                 // 按支付方式统计 (Requirement 8.4)
-                if pmStats[paymentMethod.name] == nil {
-                    pmStats[paymentMethod.name] = [:]
+                // 格式：归属人-支付方式名称
+                let ownerName = ownerDict[bill.ownerId] ?? "未知"
+                let paymentMethodName = paymentMethod.name.isEmpty ? "未知支付方式" : paymentMethod.name
+                let paymentMethodDisplayName = "\(ownerName)-\(paymentMethodName)"
+                
+                if pmStats[paymentMethodDisplayName] == nil {
+                    pmStats[paymentMethodDisplayName] = [:]
                 }
-                pmStats[paymentMethod.name]?[actualTransactionType, default: 0] += amount
+                pmStats[paymentMethodDisplayName]?[actualTransactionType, default: 0] += amount
             }
             
             // 更新发布的属性
@@ -126,7 +138,15 @@ class StatisticsViewModel: ObservableObject {
             paymentMethodStatistics = pmStats
             
         } catch {
+            print("❌ 统计计算失败: \(error)")
             errorMessage = "统计计算失败: \(error.localizedDescription)"
+            
+            // 确保即使出错也重置为安全状态
+            totalIncome = 0
+            totalExpense = 0
+            categoryStatistics = [:]
+            ownerStatistics = [:]
+            paymentMethodStatistics = [:]
         }
         
         isLoading = false

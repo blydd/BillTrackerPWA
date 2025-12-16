@@ -288,6 +288,8 @@ struct StatisticsView: View {
             ChartStatisticsView(viewModel: viewModel)
         }
         .task {
+            // 延迟一小段时间确保数据库完全初始化
+            try? await Task.sleep(nanoseconds: 100_000_000) // 0.1秒
             await loadStatistics()
         }
         .onChange(of: selectedTimeRange) { newValue in
@@ -298,8 +300,12 @@ struct StatisticsView: View {
     }
     
     private func loadStatistics() async {
-        let (startDate, endDate) = getDateRange(for: selectedTimeRange)
-        await viewModel.calculateStatistics(startDate: startDate, endDate: endDate)
+        do {
+            let (startDate, endDate) = getDateRange(for: selectedTimeRange)
+            await viewModel.calculateStatistics(startDate: startDate, endDate: endDate)
+        } catch {
+            print("❌ 统计数据加载失败: \(error)")
+        }
     }
     
     private func getDateRange(for range: TimeRange) -> (Date?, Date?) {
