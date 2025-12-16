@@ -25,7 +25,7 @@ struct ErrorHandlingExampleView: View {
                     EmptyStateView(
                         icon: "tray",
                         title: "暂无数据",
-                        message: "点击下方按钮添加一些测试数据",
+                        message: "点击下方按钮添加一些示例数据",
                         actionTitle: "添加数据",
                         action: addItems
                     )

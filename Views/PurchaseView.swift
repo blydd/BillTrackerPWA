@@ -191,7 +191,7 @@ struct PurchaseView: View {
             // 调试信息
             if iapManager.products.isEmpty && !iapManager.isLoading {
                 VStack(alignment: .leading, spacing: 8) {
-                    Text("🧪 当前为测试模式")
+                    Text("🧪 当前为开发模式")
                         .font(.caption)
                         .foregroundColor(.orange)
                     
@@ -357,11 +357,11 @@ struct StaticPurchaseCard: View {
     let subtitle: String
     let badge: String?
     
-    @State private var showingTestAlert = false
+    @State private var showingDevAlert = false
     
     var body: some View {
         Button {
-            showingTestAlert = true
+            showingDevAlert = true
         } label: {
             VStack(alignment: .leading, spacing: 12) {
                 HStack {
@@ -399,7 +399,7 @@ struct StaticPurchaseCard: View {
                 HStack {
                     Image(systemName: "flask")
                         .foregroundColor(.orange)
-                    Text("测试模式 - 点击查看说明")
+                    Text("开发模式 - 点击查看说明")
                         .font(.caption)
                         .foregroundColor(.orange)
                 }
@@ -413,10 +413,10 @@ struct StaticPurchaseCard: View {
             )
         }
         .buttonStyle(.plain)
-        .alert("测试模式说明", isPresented: $showingTestAlert) {
+        .alert("开发模式说明", isPresented: $showingDevAlert) {
             Button("了解", role: .cancel) { }
         } message: {
-            Text("当前为开发测试模式。真实的购买功能需要：\n\n1. 付费 Apple Developer 账户\n2. 在 App Store Connect 中配置产品\n3. 通过 TestFlight 或 App Store 分发\n\n价格：\(title) - \(price)")
+            Text("当前为开发模式。真实的购买功能需要：\n\n1. 付费 Apple Developer 账户\n2. 在 App Store Connect 中配置产品\n3. 通过 TestFlight 或 App Store 分发\n\n价格：\(title) - \(price)")
         }
     }
 }

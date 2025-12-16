@@ -19,7 +19,7 @@ struct ExpenseTrackerApp: App {
     
     var body: some Scene {
         WindowGroup {
-            // 临时禁用云同步以测试 IAP 功能
+            // 临时禁用云同步以简化 IAP 功能
             ContentView(repository: repository)
                 .onOpenURL { url in
                     handleQuickExpense(url: url)
@@ -516,7 +516,7 @@ struct SettingsView: View {
                 }
             }
             
-            // 临时禁用云同步 Section 以测试 IAP 功能
+            // 临时禁用云同步 Section 以简化 IAP 功能
             // 如果需要云同步，取消下面的注释
             /*
             #if !targetEnvironment(simulator)
@@ -723,8 +723,8 @@ struct SimpleWidgetConfigView: View {
         ("交通", "10", "car.fill", "blue"),
         ("购物", "100", "bag.fill", "purple")
     ]
-    @State private var showingTestAlert = false
-    @State private var testResult = ""
+    @State private var showingResultAlert = false
+    @State private var resultMessage = ""
 
     @State private var showingSuccessToast = false
     @State private var successMessage = ""
@@ -775,7 +775,7 @@ struct SimpleWidgetConfigView: View {
                         Spacer()
                         
                         Button {
-                            testQuickExpense(itemName: quickExpenseItems[index].0)
+                            performQuickExpense(itemName: quickExpenseItems[index].0)
                         } label: {
                             if processingItem == quickExpenseItems[index].0 {
                                 ProgressView()
@@ -793,7 +793,7 @@ struct SimpleWidgetConfigView: View {
             } header: {
                 Text("快速记账项目")
             } footer: {
-                Text("可以编辑项目名称和金额，点击播放按钮测试记账功能")
+                Text("可以编辑项目名称和金额，点击播放按钮进行快速记账")
                     .font(.caption)
             }
 
@@ -838,10 +838,10 @@ struct SimpleWidgetConfigView: View {
         }
         .navigationTitle("快速记账")
         .navigationBarTitleDisplayMode(.inline)
-        .alert("测试结果", isPresented: $showingTestAlert) {
+        .alert("记账结果", isPresented: $showingResultAlert) {
             Button("确定") { }
         } message: {
-            Text(testResult)
+            Text(resultMessage)
         }
         .overlay(
             // 成功提示 Toast
@@ -903,8 +903,8 @@ struct SimpleWidgetConfigView: View {
         }
     }
     
-    /// 测试快速记账功能
-    private func testQuickExpense(itemName: String) {
+    /// 快速记账功能
+    private func performQuickExpense(itemName: String) {
         // 防止重复点击
         guard processingItem == nil else { return }
         
@@ -912,7 +912,7 @@ struct SimpleWidgetConfigView: View {
         
         // 直接调用快速记账函数，避免 URL Scheme 问题
         Task {
-            let result = await performQuickExpenseTest(itemName: itemName)
+            let result = await performQuickExpenseAction(itemName: itemName)
             
             await MainActor.run {
                 processingItem = nil
@@ -930,8 +930,8 @@ struct SimpleWidgetConfigView: View {
 
                 } else {
                     // 显示错误详情
-                    testResult = result.message
-                    showingTestAlert = true
+                    resultMessage = result.message
+                    showingResultAlert = true
                 }
             }
         }
@@ -1043,8 +1043,8 @@ struct SimpleWidgetConfigView: View {
         return "食"
     }
     
-    /// 执行快速记账测试
-    private func performQuickExpenseTest(itemName: String) async -> (success: Bool, message: String) {
+    /// 执行快速记账
+    private func performQuickExpenseAction(itemName: String) async -> (success: Bool, message: String) {
         // 从当前编辑的快速记账项目中查找
         guard let itemTuple = quickExpenseItems.first(where: { $0.0 == itemName }) else {
             print("❌ 未找到快速记账项目: \(itemName)")
@@ -1134,7 +1134,7 @@ struct SimpleWidgetConfigView: View {
                 paymentMethodId: defaultPaymentMethod.id,
                 categoryIds: [categoryId],
                 ownerId: defaultOwner.id,
-                note: "🧪 小组件测试：\(itemName)",
+                note: "🚀 快速记账：\(itemName)",
                 createdAt: Date(),
                 updatedAt: Date()
             )
@@ -1142,7 +1142,7 @@ struct SimpleWidgetConfigView: View {
             // 保存账单
             try await repository.saveBill(bill)
             
-            // 更新支付方式余额（测试版本）
+            // 更新支付方式余额
             print("💳 更新支付方式余额：\(defaultPaymentMethod.name)")
             var updatedPaymentMethod = defaultPaymentMethod
             
@@ -1165,10 +1165,10 @@ struct SimpleWidgetConfigView: View {
             try await repository.updatePaymentMethod(updatedPaymentMethod)
             print("✅ 支付方式余额更新完成")
             
-            print("✅ 快速记账测试成功：\(itemName) \(item.amount) 元")
+            print("✅ 快速记账成功：\(itemName) \(item.amount) 元")
             
             return (true, """
-            ✅ 快速记账测试成功！
+            ✅ 快速记账成功！
             
             📝 记录详情：
             • 项目：\(itemName)
@@ -1181,7 +1181,7 @@ struct SimpleWidgetConfigView: View {
             """)
             
         } catch {
-            print("❌ 快速记账测试失败：\(error)")
+            print("❌ 快速记账失败：\(error)")
             return (false, """
             ❌ 快速记账失败：系统错误
             
@@ -1378,8 +1378,8 @@ struct DebugView: View {
                 .buttonStyle(.borderedProminent)
                 .disabled(isLoading)
                 
-                Button("测试快速记账") {
-                    testQuickExpense()
+                Button("快速记账演示") {
+                    performQuickExpenseDemo()
                 }
                 .buttonStyle(.bordered)
                 .disabled(isLoading)
@@ -1455,12 +1455,12 @@ struct DebugView: View {
         }
     }
     
-    private func testQuickExpense() {
+    private func performQuickExpenseDemo() {
         isLoading = true
-        addDebugInfo("🧪 开始测试快速记账...")
+        addDebugInfo("🚀 开始快速记账演示...")
         addDebugInfo("📱 模拟URL: expensetracker://quick?item=早餐")
         addDebugInfo("ℹ️ 请查看Xcode控制台输出获取详细信息")
-        addDebugInfo("ℹ️ 或者直接点击小组件测试")
+        addDebugInfo("ℹ️ 或者直接点击小组件进行快速记账")
         
         Task {
             await MainActor.run {

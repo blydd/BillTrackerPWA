@@ -23,7 +23,7 @@ struct WidgetConfigurationView: View {
                             item: selectedItems[index],
                             onTap: {
                                 Task {
-                                    await testQuickExpense(selectedItems[index])
+                                    await performQuickExpense(selectedItems[index])
                                 }
                             }
                         )
@@ -45,7 +45,7 @@ struct WidgetConfigurationView: View {
                 } header: {
                     Text("小组件项目 (最多6个)")
                 } footer: {
-                    Text("点击项目可以测试快速记账功能")
+                    Text("点击项目可以进行快速记账")
                         .font(.caption)
                 }
                 
@@ -118,14 +118,14 @@ struct WidgetConfigurationView: View {
         selectedItems.move(fromOffsets: source, toOffset: destination)
     }
     
-    private func testQuickExpense(_ item: QuickExpenseItem) async {
+    private func performQuickExpense(_ item: QuickExpenseItem) async {
         let success = await widgetManager.quickExpense(item)
         
         // 这里可以添加成功/失败的提示
         if success {
-            print("✅ 测试记账成功：\(item.title)")
+            print("✅ 快速记账成功：\(item.title)")
         } else {
-            print("❌ 测试记账失败：\(item.title)")
+            print("❌ 快速记账失败：\(item.title)")
         }
     }
 }

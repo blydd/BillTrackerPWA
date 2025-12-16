@@ -76,7 +76,7 @@ class IAPManager: NSObject, ObservableObject {
             
             if !missingIDs.isEmpty {
                 print("⚠️ 未找到的产品: \(missingIDs)")
-                errorMessage = "测试模式：部分产品未在 StoreKit 配置中找到"
+                errorMessage = "开发模式：部分产品未在 StoreKit 配置中找到"
             }
             
         } catch {
