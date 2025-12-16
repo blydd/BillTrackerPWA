@@ -525,11 +525,7 @@ struct SettingsView: View {
             #endif
             */
             
-            Section("快速功能") {
-                NavigationLink("小组件配置") {
-                    SimpleWidgetConfigView()
-                }
-            }
+
             
             Section("数据管理") {
                 NavigationLink("账单类型管理") {
@@ -576,16 +572,7 @@ struct SettingsView: View {
                     }
                 }
                 
-                NavigationLink {
-                    DebugView(repository: repository)
-                } label: {
-                    HStack {
-                        Text("调试信息")
-                        Spacer()
-                        Image(systemName: "ladybug")
-                            .foregroundColor(.purple)
-                    }
-                }
+
             }
         }
         .navigationTitle("设置")
