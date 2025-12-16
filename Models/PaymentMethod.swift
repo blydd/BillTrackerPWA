@@ -158,6 +158,18 @@ enum PaymentMethodWrapper: Codable, Equatable {
         }
     }
     
+    /// 获取余额或可用额度
+    var balance: Decimal {
+        switch self {
+        case .credit(let method): 
+            // 信用卡返回可用额度（信用额度 - 欠费金额）
+            return method.creditLimit - method.outstandingBalance
+        case .savings(let method): 
+            // 储蓄账户返回余额
+            return method.balance
+        }
+    }
+    
     // 为云同步添加时间戳（使用当前时间作为默认值）
     var createdAt: Date {
         Date() // 简化处理，实际应该存储在数据库中
