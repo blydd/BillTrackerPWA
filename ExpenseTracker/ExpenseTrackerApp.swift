@@ -544,6 +544,10 @@ struct SettingsView: View {
                     PaymentMethodListView(repository: repository)
                 }
                 
+                NavigationLink("导入账单") {
+                    BillImportView(repository: repository)
+                }
+                
                 NavigationLink("数据库导出") {
                     DatabaseExportView()
                 }

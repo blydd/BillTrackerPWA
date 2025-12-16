@@ -10,6 +10,7 @@
 		8D2C0DCD2EF04D8D001061F7 /* WidgetKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 8D2C0DCC2EF04D8D001061F7 /* WidgetKit.framework */; };
 		8D2C0DCF2EF04D8D001061F7 /* SwiftUI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 8D2C0DCE2EF04D8D001061F7 /* SwiftUI.framework */; };
 		8D2C0DDA2EF04D8E001061F7 /* ExpenseTrackerWidgetExtensionExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 8D2C0DCB2EF04D8D001061F7 /* ExpenseTrackerWidgetExtensionExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		8D2C0E092EF1150C001061F7 /* BillImportView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D2C0E082EF1150C001061F7 /* BillImportView.swift */; };
 		8DBA37902EE6BA76007FBEA5 /* AutoSyncManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8DBA378D2EE6BA76007FBEA5 /* AutoSyncManager.swift */; };
 		8DBA37912EE6BA76007FBEA5 /* CloudKitRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8DBA378E2EE6BA76007FBEA5 /* CloudKitRepository.swift */; };
 		8DBA37922EE6BA76007FBEA5 /* CloudKitSyncManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8DBA378F2EE6BA76007FBEA5 /* CloudKitSyncManager.swift */; };
@@ -86,6 +87,7 @@
 		8D2C0DCC2EF04D8D001061F7 /* WidgetKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = WidgetKit.framework; path = System/Library/Frameworks/WidgetKit.framework; sourceTree = SDKROOT; };
 		8D2C0DCE2EF04D8D001061F7 /* SwiftUI.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = SwiftUI.framework; path = System/Library/Frameworks/SwiftUI.framework; sourceTree = SDKROOT; };
 		8D2C0E072EF0518D001061F7 /* ExpenseTrackerWidgetExtensionExtension.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = ExpenseTrackerWidgetExtensionExtension.entitlements; sourceTree = "<group>"; };
+		8D2C0E082EF1150C001061F7 /* BillImportView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BillImportView.swift; sourceTree = "<group>"; };
 		8DBA378D2EE6BA76007FBEA5 /* AutoSyncManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AutoSyncManager.swift; sourceTree = "<group>"; };
 		8DBA378E2EE6BA76007FBEA5 /* CloudKitRepository.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CloudKitRepository.swift; sourceTree = "<group>"; };
 		8DBA378F2EE6BA76007FBEA5 /* CloudKitSyncManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CloudKitSyncManager.swift; sourceTree = "<group>"; };
@@ -278,6 +280,7 @@
 		8DC61B4D2ED985360043BB28 /* Views */ = {
 			isa = PBXGroup;
 			children = (
+				8D2C0E082EF1150C001061F7 /* BillImportView.swift */,
 				8DBA37992EE85CED007FBEA5 /* DatabaseExportView.swift */,
 				8DBA379A2EE85CED007FBEA5 /* PurchaseView.swift */,
 				8DBA379B2EE85CED007FBEA5 /* UpgradePromptView.swift */,
@@ -453,6 +456,7 @@
 				8DC61B5F2ED985360043BB28 /* LoadingView.swift in Sources */,
 				8DC61B602ED985360043BB28 /* BillFormView.swift in Sources */,
 				8DC61B792EE0231B0043BB28 /* DatabaseManager.swift in Sources */,
+				8D2C0E092EF1150C001061F7 /* BillImportView.swift in Sources */,
 				8DC61B7A2EE0231B0043BB28 /* SQLiteRepository.swift in Sources */,
 				8DC61B7C2EE023330043BB28 /* DatabaseInfoView.swift in Sources */,
 				8DC61B722EDDE67C0043BB28 /* InitializationViewModel.swift in Sources */,
