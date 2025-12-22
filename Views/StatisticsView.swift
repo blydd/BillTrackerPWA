@@ -8,10 +8,13 @@ struct StatisticsView: View {
     @State private var categoryTab: TransactionTypeTab = .expense
     @State private var ownerTab: TransactionTypeTab = .expense
     @State private var paymentTab: TransactionTypeTab = .expense
+    @State private var showingMonthPicker = false
+    @State private var selectedMonth = Date()
     
     enum TimeRange: String, CaseIterable {
         case thisMonth = "本月"
         case lastMonth = "上月"
+        case customMonth = "选择月份"
         case thisYear = "今年"
         case all = "全部"
     }
@@ -34,6 +37,25 @@ struct StatisticsView: View {
                     }
                 }
                 .pickerStyle(.segmented)
+                
+                // 当选择"选择月份"时显示月份选择器
+                if selectedTimeRange == .customMonth {
+                    Button(action: {
+                        showingMonthPicker = true
+                    }) {
+                        HStack {
+                            Text("选择的月份")
+                                .foregroundColor(.primary)
+                            Spacer()
+                            Text(formatMonth(selectedMonth))
+                                .foregroundColor(.secondary)
+                            Image(systemName: "chevron.right")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                    }
+                    .buttonStyle(.plain)
+                }
             }
             .listRowBackground(Color.clear)
             
@@ -287,6 +309,37 @@ struct StatisticsView: View {
         .sheet(isPresented: $showingChartView) {
             ChartStatisticsView(viewModel: viewModel)
         }
+        .sheet(isPresented: $showingMonthPicker) {
+            NavigationView {
+                VStack {
+                    DatePicker("选择月份", selection: $selectedMonth, displayedComponents: [.date])
+                        .datePickerStyle(.wheel)
+                        .labelsHidden()
+                        .environment(\.locale, Locale(identifier: "zh_CN"))
+                    
+                    Spacer()
+                }
+                .padding()
+                .navigationTitle("选择月份")
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button("取消") {
+                            showingMonthPicker = false
+                        }
+                    }
+                    ToolbarItem(placement: .confirmationAction) {
+                        Button("确定") {
+                            showingMonthPicker = false
+                            Task {
+                                await loadStatistics()
+                            }
+                        }
+                    }
+                }
+            }
+            .presentationDetents([.medium])
+        }
         .task {
             // 延迟一小段时间确保数据库完全初始化
             try? await Task.sleep(nanoseconds: 100_000_000) // 0.1秒
@@ -295,6 +348,13 @@ struct StatisticsView: View {
         .onChange(of: selectedTimeRange) { newValue in
             Task {
                 await loadStatistics()
+            }
+        }
+        .onChange(of: selectedMonth) { newValue in
+            if selectedTimeRange == .customMonth {
+                Task {
+                    await loadStatistics()
+                }
             }
         }
     }
@@ -324,6 +384,14 @@ struct StatisticsView: View {
                 return (nil, nil)
             }
             return (start, end)
+            
+        case .customMonth:
+            let start = calendar.date(from: calendar.dateComponents([.year, .month], from: selectedMonth))
+            guard let monthStart = start,
+                  let monthEnd = calendar.date(byAdding: .month, value: 1, to: monthStart) else {
+                return (nil, nil)
+            }
+            return (monthStart, monthEnd)
             
         case .thisYear:
             let start = calendar.date(from: calendar.dateComponents([.year], from: now))
@@ -385,5 +453,13 @@ struct StatisticsView: View {
         case category
         case owner
         case payment
+    }
+    
+    /// 格式化月份显示
+    private func formatMonth(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "zh_CN")
+        formatter.dateFormat = "yyyy年MM月"
+        return formatter.string(from: date)
     }
 }
