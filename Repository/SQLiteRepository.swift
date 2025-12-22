@@ -269,7 +269,7 @@ class SQLiteRepository: DataRepository {
     
     func updateBill(_ bill: Bill) async throws {
         let updateSQL = """
-        UPDATE bills SET amount = ?, payment_method_id = ?, owner_id = ?, note = ?, updated_at = ?
+        UPDATE bills SET amount = ?, payment_method_id = ?, owner_id = ?, note = ?, created_at = ?, updated_at = ?
         WHERE id = ?;
         """
         
@@ -295,11 +295,14 @@ class SQLiteRepository: DataRepository {
         } else {
             sqlite3_bind_null(statement, 4)
         }
+        ISO8601DateFormatter().string(from: bill.createdAt).withCString { createdPtr in
+            sqlite3_bind_text(statement, 5, createdPtr, -1, unsafeBitCast(-1, to: sqlite3_destructor_type.self))
+        }
         ISO8601DateFormatter().string(from: bill.updatedAt).withCString { updatedPtr in
-            sqlite3_bind_text(statement, 5, updatedPtr, -1, unsafeBitCast(-1, to: sqlite3_destructor_type.self))
+            sqlite3_bind_text(statement, 6, updatedPtr, -1, unsafeBitCast(-1, to: sqlite3_destructor_type.self))
         }
         bill.id.uuidString.withCString { idPtr in
-            sqlite3_bind_text(statement, 6, idPtr, -1, unsafeBitCast(-1, to: sqlite3_destructor_type.self))
+            sqlite3_bind_text(statement, 7, idPtr, -1, unsafeBitCast(-1, to: sqlite3_destructor_type.self))
         }
         
         print("📝 更新账单: ID=\(bill.id), 金额=\(bill.amount)")
