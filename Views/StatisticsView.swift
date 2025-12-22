@@ -338,7 +338,7 @@ struct StatisticsView: View {
                     }
                 }
             }
-            .presentationDetents([.medium])
+            .iOS16PresentationCompat()
         }
         .task {
             // 延迟一小段时间确保数据库完全初始化
