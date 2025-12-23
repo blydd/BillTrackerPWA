@@ -8,15 +8,23 @@ struct StatisticsView: View {
     @State private var categoryTab: TransactionTypeTab = .expense
     @State private var ownerTab: TransactionTypeTab = .expense
     @State private var paymentTab: TransactionTypeTab = .expense
-    @State private var showingMonthPicker = false
+    @State private var showingDateRangePicker = false
     @State private var selectedMonth = Date()
+    @State private var customStartDate = Date()
+    @State private var customEndDate = Date()
+    @State private var dateSelectionMode: DateSelectionMode = .month
     
     enum TimeRange: String, CaseIterable {
         case thisMonth = "本月"
         case lastMonth = "上月"
-        case customMonth = "选择月份"
+        case customTime = "自定义"
         case thisYear = "今年"
         case all = "全部"
+    }
+    
+    enum DateSelectionMode: String, CaseIterable {
+        case month = "选择月份"
+        case range = "日期范围"
     }
     
     enum TransactionTypeTab: String, CaseIterable {
@@ -38,17 +46,26 @@ struct StatisticsView: View {
                 }
                 .pickerStyle(.segmented)
                 
-                // 当选择"选择月份"时显示月份选择器
-                if selectedTimeRange == .customMonth {
+                // 当选择"自定义时间"时显示时间选择器
+                if selectedTimeRange == .customTime {
                     Button(action: {
-                        showingMonthPicker = true
+                        showingDateRangePicker = true
                     }) {
                         HStack {
-                            Text("选择的月份")
+                            Text("时间选择")
                                 .foregroundColor(.primary)
                             Spacer()
-                            Text(formatMonth(selectedMonth))
-                                .foregroundColor(.secondary)
+                            VStack(alignment: .trailing, spacing: 2) {
+                                if dateSelectionMode == .month {
+                                    Text(formatMonth(selectedMonth))
+                                        .foregroundColor(.secondary)
+                                        .font(.caption)
+                                } else {
+                                    Text(formatDateRange(customStartDate, customEndDate))
+                                        .foregroundColor(.secondary)
+                                        .font(.caption)
+                                }
+                            }
                             Image(systemName: "chevron.right")
                                 .font(.caption)
                                 .foregroundColor(.secondary)
@@ -309,36 +326,22 @@ struct StatisticsView: View {
         .sheet(isPresented: $showingChartView) {
             ChartStatisticsView(viewModel: viewModel)
         }
-        .sheet(isPresented: $showingMonthPicker) {
-            NavigationView {
-                VStack {
-                    DatePicker("选择月份", selection: $selectedMonth, displayedComponents: [.date])
-                        .datePickerStyle(.wheel)
-                        .labelsHidden()
-                        .environment(\.locale, Locale(identifier: "zh_CN"))
-                    
-                    Spacer()
-                }
-                .padding()
-                .navigationTitle("选择月份")
-                .navigationBarTitleDisplayMode(.inline)
-                .toolbar {
-                    ToolbarItem(placement: .cancellationAction) {
-                        Button("取消") {
-                            showingMonthPicker = false
-                        }
+        .sheet(isPresented: $showingDateRangePicker) {
+            TimeSelectionView(
+                dateSelectionMode: $dateSelectionMode,
+                selectedMonth: $selectedMonth,
+                customStartDate: $customStartDate,
+                customEndDate: $customEndDate,
+                onConfirm: {
+                    showingDateRangePicker = false
+                    Task {
+                        await loadStatistics()
                     }
-                    ToolbarItem(placement: .confirmationAction) {
-                        Button("确定") {
-                            showingMonthPicker = false
-                            Task {
-                                await loadStatistics()
-                            }
-                        }
-                    }
+                },
+                onCancel: {
+                    showingDateRangePicker = false
                 }
-            }
-            .iOS16PresentationCompat()
+            )
         }
         .task {
             // 延迟一小段时间确保数据库完全初始化
@@ -351,7 +354,21 @@ struct StatisticsView: View {
             }
         }
         .onChange(of: selectedMonth) { newValue in
-            if selectedTimeRange == .customMonth {
+            if selectedTimeRange == .customTime && dateSelectionMode == .month {
+                Task {
+                    await loadStatistics()
+                }
+            }
+        }
+        .onChange(of: customStartDate) { newValue in
+            if selectedTimeRange == .customTime && dateSelectionMode == .range {
+                Task {
+                    await loadStatistics()
+                }
+            }
+        }
+        .onChange(of: customEndDate) { newValue in
+            if selectedTimeRange == .customTime && dateSelectionMode == .range {
                 Task {
                     await loadStatistics()
                 }
@@ -385,13 +402,19 @@ struct StatisticsView: View {
             }
             return (start, end)
             
-        case .customMonth:
-            let start = calendar.date(from: calendar.dateComponents([.year, .month], from: selectedMonth))
-            guard let monthStart = start,
-                  let monthEnd = calendar.date(byAdding: .month, value: 1, to: monthStart) else {
-                return (nil, nil)
+        case .customTime:
+            if dateSelectionMode == .month {
+                let start = calendar.date(from: calendar.dateComponents([.year, .month], from: selectedMonth))
+                guard let monthStart = start,
+                      let monthEnd = calendar.date(byAdding: .month, value: 1, to: monthStart) else {
+                    return (nil, nil)
+                }
+                return (monthStart, monthEnd)
+            } else {
+                // 确保结束日期包含整天
+                let endOfDay = calendar.date(bySettingHour: 23, minute: 59, second: 59, of: customEndDate) ?? customEndDate
+                return (customStartDate, endOfDay)
             }
-            return (monthStart, monthEnd)
             
         case .thisYear:
             let start = calendar.date(from: calendar.dateComponents([.year], from: now))
@@ -461,5 +484,44 @@ struct StatisticsView: View {
         formatter.locale = Locale(identifier: "zh_CN")
         formatter.dateFormat = "yyyy年MM月"
         return formatter.string(from: date)
+    }
+    
+    /// 格式化日期范围显示
+    private func formatDateRange(_ startDate: Date, _ endDate: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "zh_CN")
+        formatter.dateFormat = "MM月dd日"
+        
+        let calendar = Calendar.current
+        if calendar.isDate(startDate, equalTo: endDate, toGranularity: .year) {
+            // 同一年
+            if calendar.isDate(startDate, equalTo: endDate, toGranularity: .month) {
+                // 同一月
+                if calendar.isDate(startDate, equalTo: endDate, toGranularity: .day) {
+                    // 同一天
+                    formatter.dateFormat = "yyyy年MM月dd日"
+                    return formatter.string(from: startDate)
+                } else {
+                    // 同一月不同天
+                    let startDay = calendar.component(.day, from: startDate)
+                    let endDay = calendar.component(.day, from: endDate)
+                    formatter.dateFormat = "yyyy年MM月"
+                    let monthStr = formatter.string(from: startDate)
+                    return "\(monthStr)\(startDay)日-\(endDay)日"
+                }
+            } else {
+                // 同一年不同月
+                let startStr = formatter.string(from: startDate)
+                let endStr = formatter.string(from: endDate)
+                let year = calendar.component(.year, from: startDate)
+                return "\(year)年\(startStr)-\(endStr)"
+            }
+        } else {
+            // 不同年
+            formatter.dateFormat = "yyyy年MM月dd日"
+            let startStr = formatter.string(from: startDate)
+            let endStr = formatter.string(from: endDate)
+            return "\(startStr)-\(endStr)"
+        }
     }
 }
