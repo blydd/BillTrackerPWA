@@ -141,10 +141,27 @@ class ExportViewModel: ObservableObject {
         let existingOwners = try await repository.fetchOwners()
         let existingPaymentMethods = try await repository.fetchPaymentMethods()
         
-        // 创建查找字典
-        let categoryDict = Dictionary(uniqueKeysWithValues: existingCategories.map { ($0.name, $0) })
-        let ownerDict = Dictionary(uniqueKeysWithValues: existingOwners.map { ($0.name, $0) })
-        let paymentMethodDict = Dictionary(uniqueKeysWithValues: existingPaymentMethods.map { ($0.name, $0) })
+        // 创建查找字典（处理可能存在的重复名称，保留第一个）
+        var categoryDict: [String: BillCategory] = [:]
+        for category in existingCategories {
+            if categoryDict[category.name] == nil {
+                categoryDict[category.name] = category
+            }
+        }
+        
+        var ownerDict: [String: Owner] = [:]
+        for owner in existingOwners {
+            if ownerDict[owner.name] == nil {
+                ownerDict[owner.name] = owner
+            }
+        }
+        
+        var paymentMethodDict: [String: PaymentMethodWrapper] = [:]
+        for method in existingPaymentMethods {
+            if paymentMethodDict[method.name] == nil {
+                paymentMethodDict[method.name] = method
+            }
+        }
         
         var importedBills: [Bill] = []
         var duplicateCount = 0
