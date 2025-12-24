@@ -58,6 +58,7 @@ struct BillFormView: View {
     @State private var errorMessage = ""
     @State private var showingUpgradePrompt = false
     @State private var showingDatePicker = false
+    @State private var recentNotes: [String] = []
     @FocusState private var isAmountFocused: Bool
     @FocusState private var isNoteFocused: Bool
     
@@ -222,17 +223,19 @@ struct BillFormView: View {
                                     .foregroundColor(.secondary)
                                     .font(.caption)
                             } else {
-                                // 已选中的标签
+                                // 已选中的标签（水平排列小标签）
                                 if !selectedCategoryIds.isEmpty {
-                                    FlowLayoutView(spacing: 8) {
-                                        ForEach(filteredCategories.filter { selectedCategoryIds.contains($0.id) }) { category in
-                                            SelectableTagView(
-                                                text: category.name,
-                                                isSelected: true,
-                                                color: .orange
-                                            ) {
-                                                hideKeyboard()
-                                                selectedCategoryIds.remove(category.id)
+                                    ScrollView(.horizontal, showsIndicators: false) {
+                                        HStack(spacing: 8) {
+                                            ForEach(filteredCategories.filter { selectedCategoryIds.contains($0.id) }) { category in
+                                                SelectableTagView(
+                                                    text: category.name,
+                                                    isSelected: true,
+                                                    color: .orange
+                                                ) {
+                                                    hideKeyboard()
+                                                    selectedCategoryIds.remove(category.id)
+                                                }
                                             }
                                         }
                                     }
@@ -257,9 +260,32 @@ struct BillFormView: View {
                     }
                     
                     Section("备注") {
-                        TextEditor(text: $note)
-                            .frame(height: 100)
+                        TextField("输入备注", text: $note)
                             .focused($isNoteFocused)
+                        
+                        // 最近备注快速选择
+                        if !recentNotes.isEmpty {
+                            ScrollView(.horizontal, showsIndicators: false) {
+                                HStack(spacing: 8) {
+                                    ForEach(recentNotes, id: \.self) { recentNote in
+                                        Button(action: {
+                                            note = recentNote
+                                            hideKeyboard()
+                                        }) {
+                                            Text(recentNote)
+                                                .font(.caption)
+                                                .lineLimit(1)
+                                                .padding(.horizontal, 10)
+                                                .padding(.vertical, 6)
+                                                .background(Color.gray.opacity(0.15))
+                                                .foregroundColor(.primary)
+                                                .cornerRadius(12)
+                                        }
+                                        .buttonStyle(.plain)
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -307,6 +333,8 @@ struct BillFormView: View {
                         isAmountFocused = true
                     }
                 }
+                // 加载最近备注
+                loadRecentNotes()
             }
             .upgradePrompt(
                 isPresented: $showingUpgradePrompt,
@@ -528,6 +556,34 @@ struct BillFormView: View {
         // 判断交易类型
         if let paymentMethod = paymentMethods.first(where: { $0.id == bill.paymentMethodId }) {
             selectedTransactionType = paymentMethod.transactionType
+        }
+    }
+    
+    /// 加载最近备注
+    private func loadRecentNotes() {
+        Task {
+            await billViewModel.loadBills()
+            // 获取最近有备注的账单，去重，最多显示5条
+            let notes = billViewModel.bills
+                .compactMap { $0.note }
+                .filter { !$0.isEmpty }
+            
+            // 去重并保持顺序
+            var seen = Set<String>()
+            var uniqueNotes: [String] = []
+            for n in notes {
+                if !seen.contains(n) {
+                    seen.insert(n)
+                    uniqueNotes.append(n)
+                }
+                if uniqueNotes.count >= 5 {
+                    break
+                }
+            }
+            
+            await MainActor.run {
+                recentNotes = uniqueNotes
+            }
         }
     }
     
