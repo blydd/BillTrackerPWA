@@ -33,6 +33,15 @@ extension View {
             return AnyView(self)
         }
     }
+    
+    /// iOS 17 兼容的 listSectionSpacing
+    func listSectionSpacingCompat(_ spacing: CGFloat) -> some View {
+        if #available(iOS 17.0, *) {
+            return AnyView(self.listSectionSpacing(spacing))
+        } else {
+            return AnyView(self)
+        }
+    }
 }
 
 /// 账单表单视图
@@ -101,7 +110,7 @@ struct BillFormView: View {
                     }
                 }
                 
-                Form {
+                List {
                     Section("基本信息") {
                         HStack {
                             TextField("金额", text: $amount)
@@ -134,10 +143,11 @@ struct BillFormView: View {
                         }
                         .buttonStyle(.plain)
                     }
+                    .listRowInsets(EdgeInsets(top: 0, leading: 16, bottom: 0, trailing: 16))
                     
                     // 归属人标签选择（放在最前面）
                     Section {
-                        VStack(alignment: .leading, spacing: 8) {
+                        VStack(alignment: .leading, spacing: 6) {
                             Text("归属人")
                                 .font(.headline)
                                 .foregroundColor(.primary)
@@ -167,13 +177,14 @@ struct BillFormView: View {
                                 }
                             }
                         }
-                        .padding(.vertical, 4)
+                        .padding(.bottom, 8)
                     }
+                    .listRowInsets(EdgeInsets(top: 0, leading: 16, bottom: 0, trailing: 16))
                     
                     // 支付方式标签选择（只有选择了归属人后才显示）
                     if selectedOwnerId != nil {
                         Section {
-                            VStack(alignment: .leading, spacing: 8) {
+                            VStack(alignment: .leading, spacing: 6) {
                                 Text("支付方式")
                                     .font(.headline)
                                     .foregroundColor(.primary)
@@ -207,13 +218,14 @@ struct BillFormView: View {
                                     }
                                 }
                             }
-                            .padding(.vertical, 4)
+                            .padding(.bottom, 8)
                         }
+                        .listRowInsets(EdgeInsets(top: 0, leading: 16, bottom: 0, trailing: 16))
                     }
                     
                     // 账单类型标签选择（多选）
                     Section {
-                        VStack(alignment: .leading, spacing: 8) {
+                        VStack(alignment: .leading, spacing: 6) {
                             Text("账单类型")
                                 .font(.headline)
                                 .foregroundColor(.primary)
@@ -256,8 +268,9 @@ struct BillFormView: View {
                                 }
                             }
                         }
-                        .padding(.vertical, 4)
+                        .padding(.bottom, 8)
                     }
+                    .listRowInsets(EdgeInsets(top: 0, leading: 16, bottom: 0, trailing: 16))
                     
                     Section("备注") {
                         TextField("输入备注", text: $note)
@@ -287,7 +300,11 @@ struct BillFormView: View {
                             }
                         }
                     }
+                    .listRowInsets(EdgeInsets(top: 0, leading: 16, bottom: 0, trailing: 16))
                 }
+                .listStyle(.insetGrouped)
+                .environment(\.defaultMinListHeaderHeight, 0)
+                .listSectionSpacingCompat(12)
             }
             .navigationTitle(editingBill == nil ? "添加账单" : "编辑账单")
             .navigationBarTitleDisplayMode(.inline)
@@ -614,22 +631,22 @@ struct SelectableTagView: View {
     
     var body: some View {
         Button(action: onTap) {
-            HStack(spacing: 4) {
+            HStack(spacing: 3) {
                 Text(text)
-                    .font(.subheadline)
+                    .font(.caption)
                 
                 if isSelected {
                     Image(systemName: "xmark.circle.fill")
-                        .font(.caption)
+                        .font(.system(size: 10))
                 }
             }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 8)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 6)
             .background(isSelected ? color : color.opacity(0.2))
             .foregroundColor(isSelected ? .white : color)
-            .cornerRadius(16)
+            .cornerRadius(12)
             .overlay(
-                RoundedRectangle(cornerRadius: 16)
+                RoundedRectangle(cornerRadius: 12)
                     .stroke(color, lineWidth: isSelected ? 0 : 1)
             )
         }
