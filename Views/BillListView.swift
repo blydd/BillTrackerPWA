@@ -36,6 +36,10 @@ struct BillListView: View {
     @State private var cachedFilteredBills: [Bill] = []
     @State private var cacheKey: String = ""
     
+    // 悬浮按钮位置
+    @State private var floatingButtonPosition: CGPoint = CGPoint(x: UIScreen.main.bounds.width - 50, y: UIScreen.main.bounds.height - 200)
+    @State private var isDragging = false
+    
     private let repository: DataRepository
     
     init(repository: DataRepository) {
@@ -48,9 +52,10 @@ struct BillListView: View {
     }
     
     var body: some View {
-        VStack(spacing: 0) {
-            // 账单限制警告
-            if let warning = subscriptionManager.getBillLimitWarning(currentBillCount: billViewModel.bills.count) {
+        ZStack {
+            VStack(spacing: 0) {
+                // 账单限制警告
+                if let warning = subscriptionManager.getBillLimitWarning(currentBillCount: billViewModel.bills.count) {
                 HStack {
                     Image(systemName: "exclamationmark.triangle.fill")
                         .foregroundColor(.orange)
@@ -273,13 +278,6 @@ struct BillListView: View {
                     .disabled(billViewModel.bills.isEmpty || exportViewModel.isExporting)
                 }
             }
-            
-            ToolbarItem(placement: .navigationBarTrailing) {
-                Button(action: { showingAddSheet = true }) {
-                    Image(systemName: "plus")
-                        .font(.title3)
-                }
-            }
         }
         .sheet(isPresented: $showingAddSheet) {
             BillFormView(
@@ -343,6 +341,15 @@ struct BillListView: View {
             )
             .iOS16PresentationLargeCompat()
         }
+            
+            // 悬浮添加按钮
+            FloatingAddButton(
+                position: $floatingButtonPosition,
+                isDragging: $isDragging
+            ) {
+                showingAddSheet = true
+            }
+        } // ZStack 结束
         .task {
             await loadData()
         }
@@ -1518,5 +1525,100 @@ struct DatePickerSheet: View {
                 }
             }
         }
+    }
+}
+
+
+/// 悬浮添加按钮组件
+struct FloatingAddButton: View {
+    @Binding var position: CGPoint
+    @Binding var isDragging: Bool
+    let action: () -> Void
+    
+    // 按钮大小
+    private let buttonSize: CGFloat = 56
+    // 安全边距
+    private let edgePadding: CGFloat = 16
+    
+    var body: some View {
+        GeometryReader { geometry in
+            Button(action: {
+                // 只有在非拖动状态下才触发点击
+                if !isDragging {
+                    action()
+                }
+            }) {
+                ZStack {
+                    // 阴影背景
+                    Circle()
+                        .fill(Color.blue)
+                        .shadow(color: Color.blue.opacity(0.4), radius: 8, x: 0, y: 4)
+                    
+                    // 图标
+                    Image(systemName: "plus")
+                        .font(.system(size: 24, weight: .semibold))
+                        .foregroundColor(.white)
+                }
+                .frame(width: buttonSize, height: buttonSize)
+            }
+            .position(constrainedPosition(in: geometry))
+            .gesture(
+                DragGesture()
+                    .onChanged { value in
+                        isDragging = true
+                        position = value.location
+                    }
+                    .onEnded { value in
+                        // 延迟重置拖动状态，避免触发点击
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                            isDragging = false
+                        }
+                        // 吸附到边缘
+                        withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                            position = snapToEdge(position: value.location, in: geometry)
+                        }
+                    }
+            )
+            .onAppear {
+                // 初始化位置：右下角
+                let safeArea = geometry.safeAreaInsets
+                position = CGPoint(
+                    x: geometry.size.width - buttonSize/2 - edgePadding,
+                    y: geometry.size.height - buttonSize/2 - edgePadding - safeArea.bottom - 60
+                )
+            }
+        }
+    }
+    
+    /// 限制按钮位置在安全区域内
+    private func constrainedPosition(in geometry: GeometryProxy) -> CGPoint {
+        let safeArea = geometry.safeAreaInsets
+        let minX = buttonSize/2 + edgePadding
+        let maxX = geometry.size.width - buttonSize/2 - edgePadding
+        let minY = buttonSize/2 + edgePadding + safeArea.top
+        let maxY = geometry.size.height - buttonSize/2 - edgePadding - safeArea.bottom
+        
+        return CGPoint(
+            x: min(max(position.x, minX), maxX),
+            y: min(max(position.y, minY), maxY)
+        )
+    }
+    
+    /// 吸附到最近的边缘
+    private func snapToEdge(position: CGPoint, in geometry: GeometryProxy) -> CGPoint {
+        let safeArea = geometry.safeAreaInsets
+        let minX = buttonSize/2 + edgePadding
+        let maxX = geometry.size.width - buttonSize/2 - edgePadding
+        let minY = buttonSize/2 + edgePadding + safeArea.top
+        let maxY = geometry.size.height - buttonSize/2 - edgePadding - safeArea.bottom
+        
+        // 限制 Y 坐标
+        let constrainedY = min(max(position.y, minY), maxY)
+        
+        // 判断靠近左边还是右边
+        let centerX = geometry.size.width / 2
+        let snapX = position.x < centerX ? minX : maxX
+        
+        return CGPoint(x: snapX, y: constrainedY)
     }
 }
