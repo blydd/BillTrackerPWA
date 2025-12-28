@@ -14,6 +14,13 @@ struct StatisticsView: View {
     @State private var customEndDate = Date()
     @State private var dateSelectionMode: DateSelectionMode = .month
     
+    // 账单详情弹窗状态
+    @State private var showingBillList = false
+    @State private var billListTitle = ""
+    @State private var billListBills: [Bill] = []
+    
+    private let repository: DataRepository
+    
     enum TimeRange: String, CaseIterable {
         case thisMonth = "本月"
         case lastMonth = "上月"
@@ -34,6 +41,7 @@ struct StatisticsView: View {
     }
     
     init(repository: DataRepository) {
+        self.repository = repository
         _viewModel = StateObject(wrappedValue: StatisticsViewModel(repository: repository))
     }
     var body: some View {
@@ -176,25 +184,35 @@ struct StatisticsView: View {
                         .padding(.vertical, 8)
                     } else {
                         ForEach(filteredCategoryStatistics, id: \.key) { item in
-                            HStack(spacing: 10) {
-                                // 类型图标
-                                Image(systemName: "tag.fill")
-                                    .font(.system(size: 12))
-                                    .foregroundColor(.orange.opacity(0.7))
-                                
-                                Text(item.key)
-                                    .font(.system(size: 15))
-                                
-                                Spacer()
-                                
-                                Text("\(item.value as NSDecimalNumber)")
-                                    .font(.system(size: 15, weight: .medium))
-                                    .foregroundColor(colorForTab(categoryTab))
+                            Button(action: {
+                                showBillsForCategory(name: item.key)
+                            }) {
+                                HStack(spacing: 10) {
+                                    // 类型图标
+                                    Image(systemName: "tag.fill")
+                                        .font(.system(size: 12))
+                                        .foregroundColor(.orange.opacity(0.7))
+                                    
+                                    Text(item.key)
+                                        .font(.system(size: 15))
+                                        .foregroundColor(.primary)
+                                    
+                                    Spacer()
+                                    
+                                    Text("\(item.value as NSDecimalNumber)")
+                                        .font(.system(size: 15, weight: .medium))
+                                        .foregroundColor(colorForTab(categoryTab))
+                                    
+                                    Image(systemName: "chevron.right")
+                                        .font(.system(size: 12))
+                                        .foregroundColor(.secondary)
+                                }
+                                .padding(.vertical, 6)
+                                .padding(.horizontal, 10)
+                                .background(colorForTab(categoryTab).opacity(0.05))
+                                .cornerRadius(6)
                             }
-                            .padding(.vertical, 6)
-                            .padding(.horizontal, 10)
-                            .background(colorForTab(categoryTab).opacity(0.05))
-                            .cornerRadius(6)
+                            .buttonStyle(.plain)
                         }
                     }
                 } header: {
@@ -228,25 +246,35 @@ struct StatisticsView: View {
                         .padding(.vertical, 8)
                     } else {
                         ForEach(filteredOwnerStatistics, id: \.key) { item in
-                            HStack(spacing: 10) {
-                                // 归属人图标
-                                Image(systemName: "person.fill")
-                                    .font(.system(size: 12))
-                                    .foregroundColor(.green.opacity(0.7))
-                                
-                                Text(item.key)
-                                    .font(.system(size: 15))
-                                
-                                Spacer()
-                                
-                                Text("\(item.value as NSDecimalNumber)")
-                                    .font(.system(size: 15, weight: .medium))
-                                    .foregroundColor(colorForTab(ownerTab))
+                            Button(action: {
+                                showBillsForOwner(name: item.key)
+                            }) {
+                                HStack(spacing: 10) {
+                                    // 归属人图标
+                                    Image(systemName: "person.fill")
+                                        .font(.system(size: 12))
+                                        .foregroundColor(.green.opacity(0.7))
+                                    
+                                    Text(item.key)
+                                        .font(.system(size: 15))
+                                        .foregroundColor(.primary)
+                                    
+                                    Spacer()
+                                    
+                                    Text("\(item.value as NSDecimalNumber)")
+                                        .font(.system(size: 15, weight: .medium))
+                                        .foregroundColor(colorForTab(ownerTab))
+                                    
+                                    Image(systemName: "chevron.right")
+                                        .font(.system(size: 12))
+                                        .foregroundColor(.secondary)
+                                }
+                                .padding(.vertical, 6)
+                                .padding(.horizontal, 10)
+                                .background(colorForTab(ownerTab).opacity(0.05))
+                                .cornerRadius(6)
                             }
-                            .padding(.vertical, 6)
-                            .padding(.horizontal, 10)
-                            .background(colorForTab(ownerTab).opacity(0.05))
-                            .cornerRadius(6)
+                            .buttonStyle(.plain)
                         }
                     }
                 } header: {
@@ -280,25 +308,35 @@ struct StatisticsView: View {
                         .padding(.vertical, 8)
                     } else {
                         ForEach(filteredPaymentStatistics, id: \.key) { item in
-                            HStack(spacing: 10) {
-                                // 支付方式图标
-                                Image(systemName: "creditcard.fill")
-                                    .font(.system(size: 12))
-                                    .foregroundColor(.blue.opacity(0.7))
-                                
-                                Text(item.key)
-                                    .font(.system(size: 15))
-                                
-                                Spacer()
-                                
-                                Text("\(item.value as NSDecimalNumber)")
-                                    .font(.system(size: 15, weight: .medium))
-                                    .foregroundColor(colorForTab(paymentTab))
+                            Button(action: {
+                                showBillsForPaymentMethod(displayName: item.key)
+                            }) {
+                                HStack(spacing: 10) {
+                                    // 支付方式图标
+                                    Image(systemName: "creditcard.fill")
+                                        .font(.system(size: 12))
+                                        .foregroundColor(.blue.opacity(0.7))
+                                    
+                                    Text(item.key)
+                                        .font(.system(size: 15))
+                                        .foregroundColor(.primary)
+                                    
+                                    Spacer()
+                                    
+                                    Text("\(item.value as NSDecimalNumber)")
+                                        .font(.system(size: 15, weight: .medium))
+                                        .foregroundColor(colorForTab(paymentTab))
+                                    
+                                    Image(systemName: "chevron.right")
+                                        .font(.system(size: 12))
+                                        .foregroundColor(.secondary)
+                                }
+                                .padding(.vertical, 6)
+                                .padding(.horizontal, 10)
+                                .background(colorForTab(paymentTab).opacity(0.05))
+                                .cornerRadius(6)
                             }
-                            .padding(.vertical, 6)
-                            .padding(.horizontal, 10)
-                            .background(colorForTab(paymentTab).opacity(0.05))
-                            .cornerRadius(6)
+                            .buttonStyle(.plain)
                         }
                     }
                 } header: {
@@ -340,6 +378,22 @@ struct StatisticsView: View {
                 },
                 onCancel: {
                     showingDateRangePicker = false
+                }
+            )
+        }
+        .sheet(isPresented: $showingBillList) {
+            StatisticsBillListView(
+                title: billListTitle,
+                bills: billListBills,
+                repository: repository,
+                onDismiss: {
+                    showingBillList = false
+                },
+                onDataChanged: {
+                    // 数据变化后刷新统计
+                    Task {
+                        await loadStatistics()
+                    }
                 }
             )
         }
@@ -472,6 +526,40 @@ struct StatisticsView: View {
         case .excluded:
             return .gray
         }
+    }
+    
+    private func transactionTypeForTab(_ tab: TransactionTypeTab) -> TransactionType {
+        switch tab {
+        case .income:
+            return .income
+        case .expense:
+            return .expense
+        case .excluded:
+            return .excluded
+        }
+    }
+    
+    // MARK: - 显示账单详情
+    
+    private func showBillsForCategory(name: String) {
+        let transactionType = transactionTypeForTab(categoryTab)
+        billListBills = viewModel.getBillsForCategory(name: name, transactionType: transactionType)
+        billListTitle = "\(name) - \(categoryTab.rawValue)"
+        showingBillList = true
+    }
+    
+    private func showBillsForOwner(name: String) {
+        let transactionType = transactionTypeForTab(ownerTab)
+        billListBills = viewModel.getBillsForOwner(name: name, transactionType: transactionType)
+        billListTitle = "\(name) - \(ownerTab.rawValue)"
+        showingBillList = true
+    }
+    
+    private func showBillsForPaymentMethod(displayName: String) {
+        let transactionType = transactionTypeForTab(paymentTab)
+        billListBills = viewModel.getBillsForPaymentMethod(displayName: displayName, transactionType: transactionType)
+        billListTitle = "\(displayName) - \(paymentTab.rawValue)"
+        showingBillList = true
     }
     
     enum StatisticsType {

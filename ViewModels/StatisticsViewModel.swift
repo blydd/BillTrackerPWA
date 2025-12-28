@@ -13,10 +13,98 @@ class StatisticsViewModel: ObservableObject {
     @Published var errorMessage: String?
     @Published var isLoading: Bool = false
     
-    private let repository: DataRepository
+    // 存储筛选后的账单和相关数据，用于详情查看
+    private(set) var filteredBills: [Bill] = []
+    private(set) var categories: [BillCategory] = []
+    private(set) var owners: [Owner] = []
+    private(set) var paymentMethods: [PaymentMethodWrapper] = []
+    
+    let repository: DataRepository
     
     init(repository: DataRepository) {
         self.repository = repository
+    }
+    
+    /// 获取按类型筛选的账单
+    func getBillsForCategory(name: String, transactionType: TransactionType) -> [Bill] {
+        let categoryIds = categories.filter { $0.name == name }.map { $0.id }
+        return filteredBills.filter { bill in
+            // 检查账单是否包含该类型
+            let hasCategory = !Set(bill.categoryIds).isDisjoint(with: Set(categoryIds))
+            guard hasCategory else { return false }
+            
+            // 检查交易类型
+            let billCategories = bill.categoryIds.compactMap { id in
+                categories.first(where: { $0.id == id })
+            }
+            let isExcluded = !billCategories.isEmpty && billCategories.allSatisfy { $0.transactionType == .excluded }
+            
+            let actualType: TransactionType
+            if isExcluded {
+                actualType = .excluded
+            } else if bill.amount > 0 {
+                actualType = .income
+            } else {
+                actualType = .expense
+            }
+            
+            return actualType == transactionType
+        }
+    }
+    
+    /// 获取按归属人筛选的账单
+    func getBillsForOwner(name: String, transactionType: TransactionType) -> [Bill] {
+        let ownerIds = owners.filter { $0.name == name }.map { $0.id }
+        return filteredBills.filter { bill in
+            guard ownerIds.contains(bill.ownerId) else { return false }
+            
+            // 检查交易类型
+            let billCategories = bill.categoryIds.compactMap { id in
+                categories.first(where: { $0.id == id })
+            }
+            let isExcluded = !billCategories.isEmpty && billCategories.allSatisfy { $0.transactionType == .excluded }
+            
+            let actualType: TransactionType
+            if isExcluded {
+                actualType = .excluded
+            } else if bill.amount > 0 {
+                actualType = .income
+            } else {
+                actualType = .expense
+            }
+            
+            return actualType == transactionType
+        }
+    }
+    
+    /// 获取按支付方式筛选的账单
+    func getBillsForPaymentMethod(displayName: String, transactionType: TransactionType) -> [Bill] {
+        // displayName 格式为 "归属人-支付方式名称"
+        return filteredBills.filter { bill in
+            let ownerName = owners.first(where: { $0.id == bill.ownerId })?.name ?? "未知"
+            let paymentMethod = paymentMethods.first(where: { $0.id == bill.paymentMethodId })
+            let paymentMethodName = paymentMethod?.name ?? "未知支付方式"
+            let billDisplayName = "\(ownerName)-\(paymentMethodName)"
+            
+            guard billDisplayName == displayName else { return false }
+            
+            // 检查交易类型
+            let billCategories = bill.categoryIds.compactMap { id in
+                categories.first(where: { $0.id == id })
+            }
+            let isExcluded = !billCategories.isEmpty && billCategories.allSatisfy { $0.transactionType == .excluded }
+            
+            let actualType: TransactionType
+            if isExcluded {
+                actualType = .excluded
+            } else if bill.amount > 0 {
+                actualType = .income
+            } else {
+                actualType = .expense
+            }
+            
+            return actualType == transactionType
+        }
     }
     
     // MARK: - Statistics Calculation
@@ -35,13 +123,14 @@ class StatisticsViewModel: ObservableObject {
         categoryStatistics = [:]
         ownerStatistics = [:]
         paymentMethodStatistics = [:]
+        filteredBills = []
         
         do {
             // 获取所有数据
             var bills = try await repository.fetchBills()
-            let categories = try await repository.fetchCategories()
-            let owners = try await repository.fetchOwners()
-            let paymentMethods = try await repository.fetchPaymentMethods()
+            categories = try await repository.fetchCategories()
+            owners = try await repository.fetchOwners()
+            paymentMethods = try await repository.fetchPaymentMethods()
             
             // 筛选时间范围
             if let startDate = startDate {
@@ -50,6 +139,9 @@ class StatisticsViewModel: ObservableObject {
                        if let endDate = endDate {
                 bills = bills.filter { $0.createdAt <= endDate }
             }
+            
+            // 保存筛选后的账单
+            filteredBills = bills
             
             // 创建字典以便快速查找
             let categoryDict = Dictionary(uniqueKeysWithValues: categories.map { ($0.id, $0.name) })
@@ -147,6 +239,7 @@ class StatisticsViewModel: ObservableObject {
             categoryStatistics = [:]
             ownerStatistics = [:]
             paymentMethodStatistics = [:]
+            filteredBills = []
         }
         
         isLoading = false

@@ -9,6 +9,7 @@
 /* Begin PBXBuildFile section */
 		8D2C0E092EF1150C001061F7 /* BillImportView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D2C0E082EF1150C001061F7 /* BillImportView.swift */; };
 		8D3B1A292EF98D8100BDE7BC /* TimeSelectionView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D3B1A282EF98D8100BDE7BC /* TimeSelectionView.swift */; };
+		8D3B1A2B2EF98D8200BDE7BC /* StatisticsBillListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D3B1A2A2EF98D8200BDE7BC /* StatisticsBillListView.swift */; };
 		8DBA37902EE6BA76007FBEA5 /* AutoSyncManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8DBA378D2EE6BA76007FBEA5 /* AutoSyncManager.swift */; };
 		8DBA37912EE6BA76007FBEA5 /* CloudKitRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8DBA378E2EE6BA76007FBEA5 /* CloudKitRepository.swift */; };
 		8DBA37922EE6BA76007FBEA5 /* CloudKitSyncManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8DBA378F2EE6BA76007FBEA5 /* CloudKitSyncManager.swift */; };
@@ -75,6 +76,7 @@
 		8D2C0E072EF0518D001061F7 /* ExpenseTrackerWidgetExtensionExtension.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = ExpenseTrackerWidgetExtensionExtension.entitlements; sourceTree = "<group>"; };
 		8D2C0E082EF1150C001061F7 /* BillImportView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BillImportView.swift; sourceTree = "<group>"; };
 		8D3B1A282EF98D8100BDE7BC /* TimeSelectionView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimeSelectionView.swift; sourceTree = "<group>"; };
+		8D3B1A2A2EF98D8200BDE7BC /* StatisticsBillListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatisticsBillListView.swift; sourceTree = "<group>"; };
 		8DBA378D2EE6BA76007FBEA5 /* AutoSyncManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AutoSyncManager.swift; sourceTree = "<group>"; };
 		8DBA378E2EE6BA76007FBEA5 /* CloudKitRepository.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CloudKitRepository.swift; sourceTree = "<group>"; };
 		8DBA378F2EE6BA76007FBEA5 /* CloudKitSyncManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CloudKitSyncManager.swift; sourceTree = "<group>"; };
@@ -266,6 +268,7 @@
 				8DC61B492ED985360043BB28 /* OwnerManagementView.swift */,
 				8DC61B4A2ED985360043BB28 /* PaymentMethodListView.swift */,
 				8DC61B4B2ED985360043BB28 /* StatisticsView.swift */,
+				8D3B1A2A2EF98D8200BDE7BC /* StatisticsBillListView.swift */,
 				8DC61B4C2ED985360043BB28 /* ToastView.swift */,
 			);
 			path = Views;
@@ -363,6 +366,7 @@
 				8DC61B502ED985360043BB28 /* Bill.swift in Sources */,
 				8DC61B522ED985360043BB28 /* BillCategory.swift in Sources */,
 				8DC61B532ED985360043BB28 /* StatisticsView.swift in Sources */,
+				8D3B1A2B2EF98D8200BDE7BC /* StatisticsBillListView.swift in Sources */,
 				8DC61B542ED985360043BB28 /* OwnerViewModel.swift in Sources */,
 				8DC61B552ED985360043BB28 /* ErrorAlertModifier.swift in Sources */,
 				8DBA37AD2EE8605B007FBEA5 /* IAPManager.swift in Sources */,
