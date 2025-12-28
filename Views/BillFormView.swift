@@ -151,6 +151,7 @@ struct BillFormView: View {
                             Text("归属人")
                                 .font(.headline)
                                 .foregroundColor(.primary)
+                                .padding(.top, 8)
                             
                             if let selectedId = selectedOwnerId,
                                let selected = owners.first(where: { $0.id == selectedId }) {
@@ -188,6 +189,7 @@ struct BillFormView: View {
                                 Text("支付方式")
                                     .font(.headline)
                                     .foregroundColor(.primary)
+                                    .padding(.top, 8)
                                 
                                 if filteredPaymentMethods.isEmpty {
                                     Text("该归属人暂无可用的支付方式")
@@ -229,6 +231,7 @@ struct BillFormView: View {
                             Text("账单类型")
                                 .font(.headline)
                                 .foregroundColor(.primary)
+                                .padding(.top, 8)
                             
                             if filteredCategories.isEmpty {
                                 Text("暂无\(transactionTypeText)类型的账单类型")
@@ -633,11 +636,11 @@ struct SelectableTagView: View {
         Button(action: onTap) {
             HStack(spacing: 3) {
                 Text(text)
-                    .font(.caption)
+                    .font(.footnote)
                 
                 if isSelected {
                     Image(systemName: "xmark.circle.fill")
-                        .font(.system(size: 10))
+                        .font(.system(size: 11))
                 }
             }
             .padding(.horizontal, 10)

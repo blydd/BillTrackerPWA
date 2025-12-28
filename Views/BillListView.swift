@@ -377,10 +377,10 @@ struct BillListView: View {
             bills = bills.filter { selectedOwnerIds.contains($0.ownerId) }
         }
         
-        // 按账单类型筛选
+        // 按账单类型筛选（AND逻辑：账单必须包含所有选中的类型）
         if !selectedCategoryIds.isEmpty {
             bills = bills.filter { bill in
-                !Set(bill.categoryIds).isDisjoint(with: selectedCategoryIds)
+                selectedCategoryIds.isSubset(of: Set(bill.categoryIds))
             }
         }
         
