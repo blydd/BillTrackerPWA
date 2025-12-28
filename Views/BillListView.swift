@@ -891,7 +891,7 @@ struct BillRowView: View {
                     categories.first(where: { $0.id == id })
                 }
                 
-                LazyVGrid(columns: [GridItem(.adaptive(minimum: 60))], spacing: 4) {
+                HStack(spacing: 8) {
                     // 归属人标签
                     if let owner = owners.first(where: { $0.id == bill.ownerId }) {
                         CompactTagView(
@@ -912,15 +912,21 @@ struct BillRowView: View {
                         )
                     }
                     
-                    // 账单类型标签
-                    ForEach(categoryList) { category in
-                        CompactTagView(
-                            icon: "tag.fill",
-                            text: category.name,
-                            color: .orange,
-                            style: transactionType == .excluded ? .muted : .normal
-                        )
+                    // 账单类型标签（多个类型时更紧凑）
+                    if !categoryList.isEmpty {
+                        HStack(spacing: 3) {
+                            ForEach(categoryList) { category in
+                                CompactTagView(
+                                    icon: "tag.fill",
+                                    text: category.name,
+                                    color: .orange,
+                                    style: transactionType == .excluded ? .muted : .normal
+                                )
+                            }
+                        }
                     }
+                    
+                    Spacer()
                 }
                 
                 // 备注（如果有，更紧凑）
@@ -1097,19 +1103,19 @@ struct CompactTagView: View {
     }
     
     var body: some View {
-        HStack(spacing: 3) {
+        HStack(spacing: 2) {
             Image(systemName: icon)
-                .font(.system(size: 8))
+                .font(.system(size: 7))
             Text(text)
-                .font(.system(size: 10, weight: .medium))
+                .font(.system(size: 9, weight: .medium))
         }
-        .padding(.horizontal, 6)
-        .padding(.vertical, 3)
+        .padding(.horizontal, 4)
+        .padding(.vertical, 2)
         .background(backgroundColor)
         .foregroundColor(foregroundColor)
-        .cornerRadius(4)
+        .cornerRadius(3)
         .overlay(
-            RoundedRectangle(cornerRadius: 4)
+            RoundedRectangle(cornerRadius: 3)
                 .stroke(borderColor, lineWidth: style == .muted ? 0.5 : 0)
         )
     }
