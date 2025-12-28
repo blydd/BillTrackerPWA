@@ -411,9 +411,11 @@ struct StatisticsView: View {
                 }
                 return (monthStart, monthEnd)
             } else {
-                // 确保结束日期包含整天
+                // 确保开始日期从当天 00:00:00 开始
+                let startOfDay = calendar.startOfDay(for: customStartDate)
+                // 确保结束日期包含整天到 23:59:59
                 let endOfDay = calendar.date(bySettingHour: 23, minute: 59, second: 59, of: customEndDate) ?? customEndDate
-                return (customStartDate, endOfDay)
+                return (startOfDay, endOfDay)
             }
             
         case .thisYear:
