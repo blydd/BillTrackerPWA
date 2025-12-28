@@ -105,8 +105,8 @@ class InitializationViewModel: ObservableObject {
             "购物", "燃气", "水费", "话费", "电费", "人情", "其他"
         ]
         
-        for name in expenseCategories {
-            let category = BillCategory(name: name, transactionType: .expense)
+        for (index, name) in expenseCategories.enumerated() {
+            let category = BillCategory(name: name, transactionType: .expense, sortOrder: index)
             print("  📝 保存支出分类: \(name), ID: \(category.id)")
             try await repository.saveCategory(category)
         }
@@ -114,16 +114,16 @@ class InitializationViewModel: ObservableObject {
         // 收入类型
         let incomeCategories = ["工资", "其他"]
         
-        for name in incomeCategories {
-            let category = BillCategory(name: name, transactionType: .income)
+        for (index, name) in incomeCategories.enumerated() {
+            let category = BillCategory(name: name, transactionType: .income, sortOrder: index)
             try await repository.saveCategory(category)
         }
         
         // 不计入类型
         let excludedCategories = ["还信用卡"]
         
-        for name in excludedCategories {
-            let category = BillCategory(name: name, transactionType: .excluded)
+        for (index, name) in excludedCategories.enumerated() {
+            let category = BillCategory(name: name, transactionType: .excluded, sortOrder: index)
             try await repository.saveCategory(category)
         }
     }
@@ -132,8 +132,8 @@ class InitializationViewModel: ObservableObject {
     private func initializeOwners() async throws {
         let ownerNames = ["男主", "女主"]
         
-        for name in ownerNames {
-            let owner = Owner(name: name)
+        for (index, name) in ownerNames.enumerated() {
+            let owner = Owner(name: name, sortOrder: index)
             try await repository.saveOwner(owner)
         }
     }
@@ -172,14 +172,15 @@ class InitializationViewModel: ObservableObject {
             ("花呗", 58600, 1)
         ]
         
-        for (name, limit, billingDate) in maleCreditMethods {
+        for (index, (name, limit, billingDate)) in maleCreditMethods.enumerated() {
             let method = CreditMethod(
                 name: name,
                 transactionType: .expense,
                 creditLimit: Decimal(limit),
                 outstandingBalance: 0,
                 billingDate: billingDate,
-                ownerId: maleOwner.id
+                ownerId: maleOwner.id,
+                sortOrder: index
             )
             print("  💳 保存男主信贷: \(method.name), 额度: \(limit), 账单日: \(billingDate)")
             try await repository.savePaymentMethod(.credit(method))
@@ -200,14 +201,15 @@ class InitializationViewModel: ObservableObject {
             ("花呗", 21300, 1)
         ]
         
-        for (name, limit, billingDate) in femaleCreditMethods {
+        for (index, (name, limit, billingDate)) in femaleCreditMethods.enumerated() {
             let method = CreditMethod(
                 name: name,
                 transactionType: .expense,
                 creditLimit: Decimal(limit),
                 outstandingBalance: 0,
                 billingDate: billingDate,
-                ownerId: femaleOwner.id
+                ownerId: femaleOwner.id,
+                sortOrder: index
             )
             print("  💳 保存女主信贷: \(method.name), 额度: \(limit), 账单日: \(billingDate)")
             try await repository.savePaymentMethod(.credit(method))
@@ -220,12 +222,13 @@ class InitializationViewModel: ObservableObject {
             
             let savingsMethods = ["微信零钱", "余额宝"]
             
-            for name in savingsMethods {
+            for (index, name) in savingsMethods.enumerated() {
                 let method = SavingsMethod(
                     name: name,
                     transactionType: .expense,
                     balance: 0,
-                    ownerId: owner.id
+                    ownerId: owner.id,
+                    sortOrder: index
                 )
                 print("  💰 保存储蓄: \(method.name)")
                 try await repository.savePaymentMethod(.savings(method))

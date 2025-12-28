@@ -9,6 +9,7 @@ struct OwnerManagementView: View {
     @State private var newOwnerName = ""
     @State private var showingError = false
     @State private var errorTitle = "错误"
+    @Environment(\.editMode) private var editMode
     
     init(repository: DataRepository) {
         _viewModel = StateObject(wrappedValue: OwnerViewModel(repository: repository))
@@ -29,7 +30,9 @@ struct OwnerManagementView: View {
                 }
             }
             .onDelete(perform: deleteOwners)
+            .onMove(perform: moveOwners)
         }
+        .environment(\.editMode, .constant(.active))
         .navigationTitle("归属人")
         .toolbar {
             ToolbarItem(placement: .navigationBarTrailing) {
@@ -137,5 +140,9 @@ struct OwnerManagementView: View {
                 }
             }
         }
+    }
+    
+    private func moveOwners(from source: IndexSet, to destination: Int) {
+        viewModel.moveOwners(from: source, to: destination)
     }
 }

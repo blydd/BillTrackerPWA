@@ -21,6 +21,9 @@ class SQLiteRepository: DataRepository {
         
         try createTables()
         print("✅ 数据表创建成功")
+        
+        try migrateDatabase()
+        print("✅ 数据库迁移完成")
     }
     
     deinit {
@@ -82,14 +85,16 @@ class SQLiteRepository: DataRepository {
             """
             CREATE TABLE IF NOT EXISTS owners (
                 id TEXT PRIMARY KEY,
-                name TEXT NOT NULL
+                name TEXT NOT NULL,
+                sort_order INTEGER DEFAULT 0
             )
             """,
             """
             CREATE TABLE IF NOT EXISTS categories (
                 id TEXT PRIMARY KEY,
                 name TEXT NOT NULL,
-                transaction_type TEXT NOT NULL
+                transaction_type TEXT NOT NULL,
+                sort_order INTEGER DEFAULT 0
             )
             """,
             """
@@ -103,6 +108,7 @@ class SQLiteRepository: DataRepository {
                 outstanding_balance TEXT,
                 billing_date INTEGER,
                 balance TEXT,
+                sort_order INTEGER DEFAULT 0,
                 FOREIGN KEY (owner_id) REFERENCES owners(id) ON DELETE CASCADE
             )
             """,
@@ -142,6 +148,61 @@ class SQLiteRepository: DataRepository {
                 throw SQLiteError.createTableFailed
             }
         }
+    }
+    
+    /// 数据库迁移：为旧表添加 sort_order 字段
+    private func migrateDatabase() throws {
+        // 检查并添加 sort_order 字段到 owners 表
+        if !columnExists(table: "owners", column: "sort_order") {
+            let sql = "ALTER TABLE owners ADD COLUMN sort_order INTEGER DEFAULT 0"
+            if sqlite3_exec(db, sql, nil, nil, nil) != SQLITE_OK {
+                print("⚠️ 添加 owners.sort_order 字段失败（可能已存在）")
+            } else {
+                print("✅ 已添加 owners.sort_order 字段")
+            }
+        }
+        
+        // 检查并添加 sort_order 字段到 categories 表
+        if !columnExists(table: "categories", column: "sort_order") {
+            let sql = "ALTER TABLE categories ADD COLUMN sort_order INTEGER DEFAULT 0"
+            if sqlite3_exec(db, sql, nil, nil, nil) != SQLITE_OK {
+                print("⚠️ 添加 categories.sort_order 字段失败（可能已存在）")
+            } else {
+                print("✅ 已添加 categories.sort_order 字段")
+            }
+        }
+        
+        // 检查并添加 sort_order 字段到 payment_methods 表
+        if !columnExists(table: "payment_methods", column: "sort_order") {
+            let sql = "ALTER TABLE payment_methods ADD COLUMN sort_order INTEGER DEFAULT 0"
+            if sqlite3_exec(db, sql, nil, nil, nil) != SQLITE_OK {
+                print("⚠️ 添加 payment_methods.sort_order 字段失败（可能已存在）")
+            } else {
+                print("✅ 已添加 payment_methods.sort_order 字段")
+            }
+        }
+    }
+    
+    /// 检查表中是否存在指定列
+    private func columnExists(table: String, column: String) -> Bool {
+        let sql = "PRAGMA table_info(\(table))"
+        var statement: OpaquePointer?
+        
+        guard sqlite3_prepare_v2(db, sql, -1, &statement, nil) == SQLITE_OK else {
+            return false
+        }
+        
+        defer { sqlite3_finalize(statement) }
+        
+        while sqlite3_step(statement) == SQLITE_ROW {
+            if let columnName = sqlite3_column_text(statement, 1) {
+                if String(cString: columnName) == column {
+                    return true
+                }
+            }
+        }
+        
+        return false
     }
     
     // MARK: - Clear All Data
@@ -474,8 +535,8 @@ class SQLiteRepository: DataRepository {
     func savePaymentMethod(_ method: PaymentMethodWrapper) async throws {
         let insertSQL = """
         INSERT INTO payment_methods (id, name, transaction_type, account_type, owner_id, 
-                                    credit_limit, outstanding_balance, billing_date, balance)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);
+                                    credit_limit, outstanding_balance, billing_date, balance, sort_order)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
         """
         
         var statement: OpaquePointer?
@@ -510,6 +571,7 @@ class SQLiteRepository: DataRepository {
             }
             sqlite3_bind_int(statement, 8, Int32(credit.billingDate))
             sqlite3_bind_null(statement, 9)
+            sqlite3_bind_int(statement, 10, Int32(credit.sortOrder))
         case .savings(let savings):
             sqlite3_bind_null(statement, 6)
             sqlite3_bind_null(statement, 7)
@@ -517,6 +579,7 @@ class SQLiteRepository: DataRepository {
             "\(savings.balance)".withCString { balancePtr in
                 sqlite3_bind_text(statement, 9, balancePtr, -1, unsafeBitCast(-1, to: sqlite3_destructor_type.self))
             }
+            sqlite3_bind_int(statement, 10, Int32(savings.sortOrder))
         }
         
         guard sqlite3_step(statement) == SQLITE_DONE else {
@@ -530,8 +593,8 @@ class SQLiteRepository: DataRepository {
     func fetchPaymentMethods() async throws -> [PaymentMethodWrapper] {
         let querySQL = """
         SELECT id, name, transaction_type, account_type, owner_id, 
-               credit_limit, outstanding_balance, billing_date, balance 
-        FROM payment_methods;
+               credit_limit, outstanding_balance, billing_date, balance, sort_order 
+        FROM payment_methods ORDER BY sort_order ASC, name ASC;
         """
         
         var statement: OpaquePointer?
@@ -547,6 +610,7 @@ class SQLiteRepository: DataRepository {
             let transactionType = TransactionType(rawValue: String(cString: sqlite3_column_text(statement, 2)))!
             let accountType = AccountType(rawValue: String(cString: sqlite3_column_text(statement, 3)))!
             let ownerId = UUID(uuidString: String(cString: sqlite3_column_text(statement, 4)))!
+            let sortOrder = Int(sqlite3_column_int(statement, 9))
             
             if accountType == .credit {
                 let creditLimit = Decimal(string: String(cString: sqlite3_column_text(statement, 5)))!
@@ -555,13 +619,13 @@ class SQLiteRepository: DataRepository {
                 
                 let credit = CreditMethod(id: id, name: name, transactionType: transactionType,
                                         creditLimit: creditLimit, outstandingBalance: outstandingBalance,
-                                        billingDate: billingDate, ownerId: ownerId)
+                                        billingDate: billingDate, ownerId: ownerId, sortOrder: sortOrder)
                 methods.append(.credit(credit))
             } else {
                 let balance = Decimal(string: String(cString: sqlite3_column_text(statement, 8)))!
                 
                 let savings = SavingsMethod(id: id, name: name, transactionType: transactionType,
-                                          balance: balance, ownerId: ownerId)
+                                          balance: balance, ownerId: ownerId, sortOrder: sortOrder)
                 methods.append(.savings(savings))
             }
         }
@@ -573,7 +637,7 @@ class SQLiteRepository: DataRepository {
         let updateSQL = """
         UPDATE payment_methods 
         SET name = ?, transaction_type = ?, credit_limit = ?, outstanding_balance = ?, 
-            billing_date = ?, balance = ?
+            billing_date = ?, balance = ?, sort_order = ?
         WHERE id = ?;
         """
         
@@ -600,6 +664,7 @@ class SQLiteRepository: DataRepository {
             }
             sqlite3_bind_int(statement, 5, Int32(credit.billingDate))
             sqlite3_bind_null(statement, 6)
+            sqlite3_bind_int(statement, 7, Int32(credit.sortOrder))
         case .savings(let savings):
             sqlite3_bind_null(statement, 3)
             sqlite3_bind_null(statement, 4)
@@ -607,10 +672,11 @@ class SQLiteRepository: DataRepository {
             "\(savings.balance)".withCString { balancePtr in
                 sqlite3_bind_text(statement, 6, balancePtr, -1, unsafeBitCast(-1, to: sqlite3_destructor_type.self))
             }
+            sqlite3_bind_int(statement, 7, Int32(savings.sortOrder))
         }
         
         method.id.uuidString.withCString { idPtr in
-            sqlite3_bind_text(statement, 7, idPtr, -1, unsafeBitCast(-1, to: sqlite3_destructor_type.self))
+            sqlite3_bind_text(statement, 8, idPtr, -1, unsafeBitCast(-1, to: sqlite3_destructor_type.self))
         }
         
         print("💳 更新支付方式: \(method.name)")
@@ -761,7 +827,7 @@ class SQLiteRepository: DataRepository {
     // MARK: - Category Operations
     
     func saveCategory(_ category: BillCategory) async throws {
-        let insertSQL = "INSERT INTO categories (id, name, transaction_type) VALUES (?, ?, ?);"
+        let insertSQL = "INSERT INTO categories (id, name, transaction_type, sort_order) VALUES (?, ?, ?, ?);"
         
         var statement: OpaquePointer?
         guard sqlite3_prepare_v2(db, insertSQL, -1, &statement, nil) == SQLITE_OK else {
@@ -778,6 +844,7 @@ class SQLiteRepository: DataRepository {
         category.transactionType.rawValue.withCString { typePtr in
             sqlite3_bind_text(statement, 3, typePtr, -1, unsafeBitCast(-1, to: sqlite3_destructor_type.self))
         }
+        sqlite3_bind_int(statement, 4, Int32(category.sortOrder))
         
         print("  🔍 准备插入: ID=\(category.id.uuidString), name=\(category.name)")
         
@@ -806,7 +873,7 @@ class SQLiteRepository: DataRepository {
     }
     
     func fetchCategories() async throws -> [BillCategory] {
-        let querySQL = "SELECT id, name, transaction_type FROM categories;"
+        let querySQL = "SELECT id, name, transaction_type, sort_order FROM categories ORDER BY sort_order ASC, name ASC;"
         
         var statement: OpaquePointer?
         guard sqlite3_prepare_v2(db, querySQL, -1, &statement, nil) == SQLITE_OK else {
@@ -822,8 +889,9 @@ class SQLiteRepository: DataRepository {
                   let transactionType = TransactionType(rawValue: typeString) else {
                 throw SQLiteError.decodingFailed
             }
+            let sortOrder = Int(sqlite3_column_int(statement, 3))
             
-            let category = BillCategory(id: id, name: name, transactionType: transactionType)
+            let category = BillCategory(id: id, name: name, transactionType: transactionType, sortOrder: sortOrder)
             categories.append(category)
         }
         
@@ -831,7 +899,7 @@ class SQLiteRepository: DataRepository {
     }
     
     func updateCategory(_ category: BillCategory) async throws {
-        let updateSQL = "UPDATE categories SET name = ?, transaction_type = ? WHERE id = ?;"
+        let updateSQL = "UPDATE categories SET name = ?, transaction_type = ?, sort_order = ? WHERE id = ?;"
         
         var statement: OpaquePointer?
         guard sqlite3_prepare_v2(db, updateSQL, -1, &statement, nil) == SQLITE_OK else {
@@ -839,13 +907,23 @@ class SQLiteRepository: DataRepository {
         }
         defer { sqlite3_finalize(statement) }
         
-        sqlite3_bind_text(statement, 1, category.name, -1, nil)
-        sqlite3_bind_text(statement, 2, category.transactionType.rawValue, -1, nil)
-        sqlite3_bind_text(statement, 3, category.id.uuidString, -1, nil)
+        category.name.withCString { namePtr in
+            sqlite3_bind_text(statement, 1, namePtr, -1, unsafeBitCast(-1, to: sqlite3_destructor_type.self))
+        }
+        category.transactionType.rawValue.withCString { typePtr in
+            sqlite3_bind_text(statement, 2, typePtr, -1, unsafeBitCast(-1, to: sqlite3_destructor_type.self))
+        }
+        sqlite3_bind_int(statement, 3, Int32(category.sortOrder))
+        category.id.uuidString.withCString { idPtr in
+            sqlite3_bind_text(statement, 4, idPtr, -1, unsafeBitCast(-1, to: sqlite3_destructor_type.self))
+        }
         
         guard sqlite3_step(statement) == SQLITE_DONE else {
+            let errorMessage = String(cString: sqlite3_errmsg(db))
+            print("❌ 更新分类失败: \(errorMessage)")
             throw SQLiteError.executeFailed
         }
+        print("✅ 更新分类成功: \(category.name), sortOrder: \(category.sortOrder)")
     }
     
     func deleteCategory(_ category: BillCategory) async throws {
@@ -875,7 +953,7 @@ class SQLiteRepository: DataRepository {
     }
     
     func fetchCategory(by id: UUID) async throws -> BillCategory? {
-        let querySQL = "SELECT id, name, transaction_type FROM categories WHERE id = ?;"
+        let querySQL = "SELECT id, name, transaction_type, sort_order FROM categories WHERE id = ?;"
         
         var statement: OpaquePointer?
         guard sqlite3_prepare_v2(db, querySQL, -1, &statement, nil) == SQLITE_OK else {
@@ -895,8 +973,9 @@ class SQLiteRepository: DataRepository {
                       let transactionType = TransactionType(rawValue: typeString) else {
                     return nil
                 }
+                let sortOrder = Int(sqlite3_column_int(statement, 3))
                 
-                return BillCategory(id: id, name: name, transactionType: transactionType)
+                return BillCategory(id: id, name: name, transactionType: transactionType, sortOrder: sortOrder)
             } catch {
                 print("⚠️ 解析分类失败: \(error)")
                 return nil
@@ -909,7 +988,7 @@ class SQLiteRepository: DataRepository {
     // MARK: - Owner Operations
     
     func saveOwner(_ owner: Owner) async throws {
-        let insertSQL = "INSERT INTO owners (id, name) VALUES (?, ?);"
+        let insertSQL = "INSERT INTO owners (id, name, sort_order) VALUES (?, ?, ?);"
         
         var statement: OpaquePointer?
         guard sqlite3_prepare_v2(db, insertSQL, -1, &statement, nil) == SQLITE_OK else {
@@ -923,6 +1002,7 @@ class SQLiteRepository: DataRepository {
         owner.name.withCString { namePtr in
             sqlite3_bind_text(statement, 2, namePtr, -1, unsafeBitCast(-1, to: sqlite3_destructor_type.self))
         }
+        sqlite3_bind_int(statement, 3, Int32(owner.sortOrder))
         
         guard sqlite3_step(statement) == SQLITE_DONE else {
             let errorMessage = String(cString: sqlite3_errmsg(db))
@@ -933,7 +1013,7 @@ class SQLiteRepository: DataRepository {
     }
     
     func fetchOwners() async throws -> [Owner] {
-        let querySQL = "SELECT id, name FROM owners;"
+        let querySQL = "SELECT id, name, sort_order FROM owners ORDER BY sort_order ASC, name ASC;"
         
         var statement: OpaquePointer?
         guard sqlite3_prepare_v2(db, querySQL, -1, &statement, nil) == SQLITE_OK else {
@@ -948,8 +1028,9 @@ class SQLiteRepository: DataRepository {
                 guard let name = getString(from: statement, at: 1) else {
                     continue
                 }
+                let sortOrder = Int(sqlite3_column_int(statement, 2))
                 
-                let owner = Owner(id: id, name: name)
+                let owner = Owner(id: id, name: name, sortOrder: sortOrder)
                 owners.append(owner)
             } catch {
                 print("⚠️ 跳过无效的归属人记录")
@@ -961,7 +1042,7 @@ class SQLiteRepository: DataRepository {
     }
     
     func updateOwner(_ owner: Owner) async throws {
-        let updateSQL = "UPDATE owners SET name = ? WHERE id = ?;"
+        let updateSQL = "UPDATE owners SET name = ?, sort_order = ? WHERE id = ?;"
         
         var statement: OpaquePointer?
         guard sqlite3_prepare_v2(db, updateSQL, -1, &statement, nil) == SQLITE_OK else {
@@ -969,12 +1050,20 @@ class SQLiteRepository: DataRepository {
         }
         defer { sqlite3_finalize(statement) }
         
-        sqlite3_bind_text(statement, 1, owner.name, -1, nil)
-        sqlite3_bind_text(statement, 2, owner.id.uuidString, -1, nil)
+        owner.name.withCString { namePtr in
+            sqlite3_bind_text(statement, 1, namePtr, -1, unsafeBitCast(-1, to: sqlite3_destructor_type.self))
+        }
+        sqlite3_bind_int(statement, 2, Int32(owner.sortOrder))
+        owner.id.uuidString.withCString { idPtr in
+            sqlite3_bind_text(statement, 3, idPtr, -1, unsafeBitCast(-1, to: sqlite3_destructor_type.self))
+        }
         
         guard sqlite3_step(statement) == SQLITE_DONE else {
+            let errorMessage = String(cString: sqlite3_errmsg(db))
+            print("❌ 更新归属人失败: \(errorMessage)")
             throw SQLiteError.executeFailed
         }
+        print("✅ 更新归属人成功: \(owner.name), sortOrder: \(owner.sortOrder)")
     }
     
     func deleteOwner(_ owner: Owner) async throws {

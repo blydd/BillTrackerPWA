@@ -11,7 +11,10 @@ struct CategoryManagementView: View {
     @State private var newTransactionType: TransactionType = .expense
     @State private var showingError = false
     
+    private let repository: DataRepository
+    
     init(repository: DataRepository) {
+        self.repository = repository
         _viewModel = StateObject(wrappedValue: CategoryViewModel(repository: repository))
     }
     
@@ -42,7 +45,9 @@ struct CategoryManagementView: View {
                     }
                 }
                 .onDelete(perform: deleteCategories)
+                .onMove(perform: moveCategories)
             }
+            .environment(\.editMode, .constant(.active))
         }
         .navigationTitle("账单类型")
         .toolbar {
@@ -161,9 +166,11 @@ struct CategoryManagementView: View {
         }
     }
     
-    // 根据选中的Tab过滤类型
+    // 根据选中的Tab过滤类型并按sortOrder排序
     private var filteredCategories: [BillCategory] {
-        viewModel.categories.filter { $0.transactionType == selectedTab }
+        viewModel.categories
+            .filter { $0.transactionType == selectedTab }
+            .sorted { $0.sortOrder < $1.sortOrder }
     }
     
     private func deleteCategories(at offsets: IndexSet) {
@@ -177,6 +184,10 @@ struct CategoryManagementView: View {
                 }
             }
         }
+    }
+    
+    private func moveCategories(from source: IndexSet, to destination: Int) {
+        viewModel.moveCategories(from: source, to: destination, transactionType: selectedTab)
     }
     
     private func transactionTypeText(_ type: TransactionType) -> String {

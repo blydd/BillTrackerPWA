@@ -1,5 +1,6 @@
 import Foundation
 import Combine
+import SwiftUI
 
 /// 账单类型管理ViewModel
 /// 负责账单类型的创建、编辑、删除和名称唯一性验证
@@ -123,5 +124,44 @@ class CategoryViewModel: ObservableObject {
     func isNameUnique(_ name: String, excludingId: UUID) -> Bool {
         let trimmedName = name.trimmingCharacters(in: .whitespacesAndNewlines)
         return !categories.contains(where: { $0.id != excludingId && $0.name == trimmedName })
+    }
+    
+    /// 移动账单类型排序（在指定交易类型内）
+    /// - Parameters:
+    ///   - source: 源索引集（基于排序后的数组）
+    ///   - destination: 目标索引（基于排序后的数组）
+    ///   - transactionType: 交易类型
+    func moveCategories(from source: IndexSet, to destination: Int, transactionType: TransactionType) {
+        // 获取当前类型的分类，按 sortOrder 排序
+        var filtered = categories
+            .filter { $0.transactionType == transactionType }
+            .sorted { $0.sortOrder < $1.sortOrder }
+        
+        // 移动
+        filtered.move(fromOffsets: source, toOffset: destination)
+        
+        // 更新 sortOrder 并写回主数组
+        for (newIndex, item) in filtered.enumerated() {
+            if let mainIndex = categories.firstIndex(where: { $0.id == item.id }) {
+                categories[mainIndex].sortOrder = newIndex
+            }
+        }
+        
+        // 异步保存到数据库
+        let itemsToSave = filtered.enumerated().map { (index, item) -> BillCategory in
+            var updated = item
+            updated.sortOrder = index
+            return updated
+        }
+        
+        Task {
+            for item in itemsToSave {
+                do {
+                    try await repository.updateCategory(item)
+                } catch {
+                    print("更新账单类型排序失败: \(error)")
+                }
+            }
+        }
     }
 }

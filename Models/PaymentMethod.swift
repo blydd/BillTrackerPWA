@@ -18,6 +18,7 @@ struct CreditMethod: PaymentMethod, Equatable {
     var outstandingBalance: Decimal    // 欠费金额
     var billingDate: Int               // 账单日
     var ownerId: UUID                  // 归属人ID
+    var sortOrder: Int                 // 排序顺序
     
     init(id: UUID = UUID(), 
          name: String, 
@@ -25,7 +26,8 @@ struct CreditMethod: PaymentMethod, Equatable {
          creditLimit: Decimal,
          outstandingBalance: Decimal,
          billingDate: Int,
-         ownerId: UUID) {
+         ownerId: UUID,
+         sortOrder: Int = 0) {
         self.id = id
         self.name = name
         self.transactionType = transactionType
@@ -33,13 +35,14 @@ struct CreditMethod: PaymentMethod, Equatable {
         self.outstandingBalance = outstandingBalance
         self.billingDate = billingDate
         self.ownerId = ownerId
+        self.sortOrder = sortOrder
     }
 }
 
 // MARK: - Codable
 extension CreditMethod: Codable {
     enum CodingKeys: String, CodingKey {
-        case id, name, transactionType, creditLimit, outstandingBalance, billingDate, ownerId
+        case id, name, transactionType, creditLimit, outstandingBalance, billingDate, ownerId, sortOrder
     }
     
     init(from decoder: Decoder) throws {
@@ -52,6 +55,7 @@ extension CreditMethod: Codable {
         billingDate = try container.decode(Int.self, forKey: .billingDate)
         // 兼容旧数据：如果没有ownerId，使用一个默认值（需要后续手动设置）
         ownerId = try container.decodeIfPresent(UUID.self, forKey: .ownerId) ?? UUID()
+        sortOrder = try container.decodeIfPresent(Int.self, forKey: .sortOrder) ?? 0
     }
 }
 
@@ -63,24 +67,27 @@ struct SavingsMethod: PaymentMethod, Equatable {
     var accountType: AccountType { .savings }
     var balance: Decimal                // 余额
     var ownerId: UUID                   // 归属人ID
+    var sortOrder: Int                  // 排序顺序
     
     init(id: UUID = UUID(),
          name: String,
          transactionType: TransactionType,
          balance: Decimal,
-         ownerId: UUID) {
+         ownerId: UUID,
+         sortOrder: Int = 0) {
         self.id = id
         self.name = name
         self.transactionType = transactionType
         self.balance = balance
         self.ownerId = ownerId
+        self.sortOrder = sortOrder
     }
 }
 
 // MARK: - Codable
 extension SavingsMethod: Codable {
     enum CodingKeys: String, CodingKey {
-        case id, name, transactionType, balance, ownerId
+        case id, name, transactionType, balance, ownerId, sortOrder
     }
     
     init(from decoder: Decoder) throws {
@@ -91,6 +98,7 @@ extension SavingsMethod: Codable {
         balance = try container.decode(Decimal.self, forKey: .balance)
         // 兼容旧数据：如果没有ownerId，使用一个默认值
         ownerId = try container.decodeIfPresent(UUID.self, forKey: .ownerId) ?? UUID()
+        sortOrder = try container.decodeIfPresent(Int.self, forKey: .sortOrder) ?? 0
     }
 }
 

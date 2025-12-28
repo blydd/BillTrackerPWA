@@ -126,6 +126,7 @@ struct PaymentMethodListView: View {
                         .padding(.vertical, 4)
                     }
                     .onDelete(perform: deleteCreditMethods)
+                    .onMove(perform: moveCreditMethods)
                 } else {
                     ForEach(filteredSavingsMethods, id: \.id) { method in
                         HStack {
@@ -161,8 +162,10 @@ struct PaymentMethodListView: View {
                         .padding(.vertical, 4)
                     }
                     .onDelete(perform: deleteSavingsMethods)
+                    .onMove(perform: moveSavingsMethods)
                 }
             }
+            .environment(\.editMode, .constant(.active))
         }
         .navigationTitle("支付方式")
         .toolbar {
@@ -219,20 +222,26 @@ struct PaymentMethodListView: View {
         }
     }
     
-    // 根据选择的归属人过滤信贷方式
+    // 根据选择的归属人过滤信贷方式并按sortOrder排序
     private var filteredCreditMethods: [CreditMethod] {
-        guard let ownerId = selectedOwnerIdForFilter else {
-            return viewModel.creditMethods
+        let methods: [CreditMethod]
+        if let ownerId = selectedOwnerIdForFilter {
+            methods = viewModel.creditMethods.filter { $0.ownerId == ownerId }
+        } else {
+            methods = viewModel.creditMethods
         }
-        return viewModel.creditMethods.filter { $0.ownerId == ownerId }
+        return methods.sorted { $0.sortOrder < $1.sortOrder }
     }
     
-    // 根据选择的归属人过滤储蓄方式
+    // 根据选择的归属人过滤储蓄方式并按sortOrder排序
     private var filteredSavingsMethods: [SavingsMethod] {
-        guard let ownerId = selectedOwnerIdForFilter else {
-            return viewModel.savingsMethods
+        let methods: [SavingsMethod]
+        if let ownerId = selectedOwnerIdForFilter {
+            methods = viewModel.savingsMethods.filter { $0.ownerId == ownerId }
+        } else {
+            methods = viewModel.savingsMethods
         }
-        return viewModel.savingsMethods.filter { $0.ownerId == ownerId }
+        return methods.sorted { $0.sortOrder < $1.sortOrder }
     }
     private var addCreditMethodSheet: some View {
         NavigationView {
@@ -631,6 +640,16 @@ struct PaymentMethodListView: View {
             showingDeleteAlert = true
             break // 一次只处理一个
         }
+    }
+    
+    /// 移动信贷方式排序
+    private func moveCreditMethods(from source: IndexSet, to destination: Int) {
+        viewModel.moveCreditMethods(from: source, to: destination, ownerId: selectedOwnerIdForFilter)
+    }
+    
+    /// 移动储蓄方式排序
+    private func moveSavingsMethods(from source: IndexSet, to destination: Int) {
+        viewModel.moveSavingsMethods(from: source, to: destination, ownerId: selectedOwnerIdForFilter)
     }
     
     // MARK: - 统计信息视图

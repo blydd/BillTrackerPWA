@@ -1,5 +1,6 @@
 import Foundation
 import Combine
+import SwiftUI
 
 /// 支付方式管理ViewModel
 /// 负责信贷方式和储蓄方式的创建、编辑、删除和验证
@@ -326,5 +327,97 @@ class PaymentMethodViewModel: ObservableObject {
         }
         
         isLoading = false
+    }
+    
+    /// 移动信贷方式排序
+    /// - Parameters:
+    ///   - source: 源索引集（基于排序后的数组）
+    ///   - destination: 目标索引（基于排序后的数组）
+    ///   - ownerId: 归属人ID（用于筛选）
+    func moveCreditMethods(from source: IndexSet, to destination: Int, ownerId: UUID?) {
+        // 获取筛选后的信贷方式，按 sortOrder 排序
+        var filtered: [CreditMethod]
+        if let ownerId = ownerId {
+            filtered = creditMethods.filter { $0.ownerId == ownerId }
+        } else {
+            filtered = creditMethods
+        }
+        filtered.sort { $0.sortOrder < $1.sortOrder }
+        
+        // 移动
+        filtered.move(fromOffsets: source, toOffset: destination)
+        
+        // 更新 sortOrder 并写回主数组
+        for (newIndex, item) in filtered.enumerated() {
+            if let mainIndex = paymentMethods.firstIndex(where: { $0.id == item.id }) {
+                if case .credit(var method) = paymentMethods[mainIndex] {
+                    method.sortOrder = newIndex
+                    paymentMethods[mainIndex] = .credit(method)
+                }
+            }
+        }
+        
+        // 异步保存到数据库
+        let itemsToSave = filtered.enumerated().map { (index, item) -> CreditMethod in
+            var updated = item
+            updated.sortOrder = index
+            return updated
+        }
+        
+        Task {
+            for item in itemsToSave {
+                do {
+                    try await repository.updatePaymentMethod(.credit(item))
+                } catch {
+                    print("更新信贷方式排序失败: \(error)")
+                }
+            }
+        }
+    }
+    
+    /// 移动储蓄方式排序
+    /// - Parameters:
+    ///   - source: 源索引集（基于排序后的数组）
+    ///   - destination: 目标索引（基于排序后的数组）
+    ///   - ownerId: 归属人ID（用于筛选）
+    func moveSavingsMethods(from source: IndexSet, to destination: Int, ownerId: UUID?) {
+        // 获取筛选后的储蓄方式，按 sortOrder 排序
+        var filtered: [SavingsMethod]
+        if let ownerId = ownerId {
+            filtered = savingsMethods.filter { $0.ownerId == ownerId }
+        } else {
+            filtered = savingsMethods
+        }
+        filtered.sort { $0.sortOrder < $1.sortOrder }
+        
+        // 移动
+        filtered.move(fromOffsets: source, toOffset: destination)
+        
+        // 更新 sortOrder 并写回主数组
+        for (newIndex, item) in filtered.enumerated() {
+            if let mainIndex = paymentMethods.firstIndex(where: { $0.id == item.id }) {
+                if case .savings(var method) = paymentMethods[mainIndex] {
+                    method.sortOrder = newIndex
+                    paymentMethods[mainIndex] = .savings(method)
+                }
+            }
+        }
+        
+        // 异步保存到数据库
+        let itemsToSave = filtered.enumerated().map { (index, item) -> SavingsMethod in
+            var updated = item
+            updated.sortOrder = index
+            return updated
+        }
+        
+        Task {
+            for item in itemsToSave {
+                do {
+                    try await repository.updatePaymentMethod(.savings(item))
+                } catch {
+                    print("更新储蓄方式排序失败: \(error)")
+                }
+            }
+        }
     }
 }

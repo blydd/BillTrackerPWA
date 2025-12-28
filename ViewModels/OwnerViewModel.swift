@@ -1,5 +1,6 @@
 import Foundation
 import Combine
+import SwiftUI
 
 /// 归属人管理ViewModel
 /// 负责归属人的创建、编辑、删除和名称唯一性验证
@@ -126,5 +127,31 @@ class OwnerViewModel: ObservableObject {
     func isNameUnique(_ name: String, excludingId: UUID) -> Bool {
         let trimmedName = name.trimmingCharacters(in: .whitespacesAndNewlines)
         return !owners.contains(where: { $0.id != excludingId && $0.name == trimmedName })
+    }
+    
+    /// 移动归属人排序
+    /// - Parameters:
+    ///   - source: 源索引集
+    ///   - destination: 目标索引
+    func moveOwners(from source: IndexSet, to destination: Int) {
+        // 先同步更新本地数组顺序
+        owners.move(fromOffsets: source, toOffset: destination)
+        
+        // 更新本地数组中的 sortOrder
+        for index in owners.indices {
+            owners[index].sortOrder = index
+        }
+        
+        // 异步保存排序到数据库（不再修改本地数组）
+        let ownersToSave = owners
+        Task {
+            for owner in ownersToSave {
+                do {
+                    try await repository.updateOwner(owner)
+                } catch {
+                    print("更新归属人排序失败: \(error)")
+                }
+            }
+        }
     }
 }
