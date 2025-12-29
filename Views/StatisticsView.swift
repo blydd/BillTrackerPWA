@@ -5,9 +5,8 @@ struct StatisticsView: View {
     @StateObject private var viewModel: StatisticsViewModel
     @State private var selectedTimeRange: TimeRange = .thisMonth
     @State private var showingChartView = false
-    @State private var categoryTab: TransactionTypeTab = .expense
-    @State private var ownerTab: TransactionTypeTab = .expense
-    @State private var paymentTab: TransactionTypeTab = .expense
+    @State private var selectedDimensionTab: DimensionTab = .category
+    @State private var transactionTypeTab: TransactionTypeTab = .expense
     @State private var showingDateRangePicker = false
     @State private var selectedMonth = Date()
     @State private var customStartDate = Date()
@@ -38,6 +37,12 @@ struct StatisticsView: View {
         case income = "收入"
         case expense = "支出"
         case excluded = "不计入"
+    }
+    
+    enum DimensionTab: String, CaseIterable {
+        case category = "类型"
+        case owner = "归属人"
+        case payment = "支付方式"
     }
     
     init(repository: DataRepository) {
@@ -163,9 +168,19 @@ struct StatisticsView: View {
             .listRowBackground(Color.clear)
             .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 4, trailing: 16))
             
-            if !viewModel.categoryStatistics.isEmpty {
+            if !viewModel.categoryStatistics.isEmpty || !viewModel.ownerStatistics.isEmpty || !viewModel.paymentMethodStatistics.isEmpty {
                 Section {
-                    Picker("", selection: $categoryTab) {
+                    // 维度切换 Tab
+                    Picker("统计维度", selection: $selectedDimensionTab) {
+                        ForEach(DimensionTab.allCases, id: \.self) { tab in
+                            Text(tab.rawValue).tag(tab)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+                    .listRowBackground(Color.clear)
+                    
+                    // 收入/支出/不计入 切换
+                    Picker("交易类型", selection: $transactionTypeTab) {
                         ForEach(TransactionTypeTab.allCases, id: \.self) { tab in
                             Text(tab.rawValue).tag(tab)
                         }
@@ -173,177 +188,56 @@ struct StatisticsView: View {
                     .pickerStyle(.segmented)
                     .listRowBackground(Color.clear)
                     
-                    if filteredCategoryStatistics.isEmpty {
-                        HStack {
-                            Spacer()
-                            Text("暂无数据")
-                                .font(.subheadline)
-                                .foregroundColor(.secondary)
-                            Spacer()
-                        }
-                        .padding(.vertical, 8)
-                    } else {
-                        ForEach(filteredCategoryStatistics, id: \.key) { item in
-                            Button(action: {
-                                showBillsForCategory(name: item.key)
-                            }) {
-                                HStack(spacing: 10) {
-                                    // 类型图标
-                                    Image(systemName: "tag.fill")
-                                        .font(.system(size: 12))
-                                        .foregroundColor(.orange.opacity(0.7))
-                                    
-                                    Text(item.key)
-                                        .font(.system(size: 15))
-                                        .foregroundColor(.primary)
-                                    
-                                    Spacer()
-                                    
-                                    Text("\(item.value as NSDecimalNumber)")
-                                        .font(.system(size: 15, weight: .medium))
-                                        .foregroundColor(colorForTab(categoryTab))
-                                    
-                                    Image(systemName: "chevron.right")
-                                        .font(.system(size: 12))
-                                        .foregroundColor(.secondary)
-                                }
-                                .padding(.vertical, 6)
-                                .padding(.horizontal, 10)
-                                .background(colorForTab(categoryTab).opacity(0.05))
-                                .cornerRadius(6)
+                    // 根据选中的维度显示对应数据
+                    switch selectedDimensionTab {
+                    case .category:
+                        if filteredCategoryStatistics.isEmpty {
+                            emptyDataView
+                        } else {
+                            ForEach(filteredCategoryStatistics, id: \.key) { item in
+                                statisticsRowButton(
+                                    icon: "tag.fill",
+                                    iconColor: .orange,
+                                    name: item.key,
+                                    value: item.value,
+                                    action: { showBillsForCategory(name: item.key) }
+                                )
                             }
-                            .buttonStyle(.plain)
+                        }
+                    case .owner:
+                        if filteredOwnerStatistics.isEmpty {
+                            emptyDataView
+                        } else {
+                            ForEach(filteredOwnerStatistics, id: \.key) { item in
+                                statisticsRowButton(
+                                    icon: "person.fill",
+                                    iconColor: .green,
+                                    name: item.key,
+                                    value: item.value,
+                                    action: { showBillsForOwner(name: item.key) }
+                                )
+                            }
+                        }
+                    case .payment:
+                        if filteredPaymentStatistics.isEmpty {
+                            emptyDataView
+                        } else {
+                            ForEach(filteredPaymentStatistics, id: \.key) { item in
+                                statisticsRowButton(
+                                    icon: "creditcard.fill",
+                                    iconColor: .blue,
+                                    name: item.key,
+                                    value: item.value,
+                                    action: { showBillsForPaymentMethod(displayName: item.key) }
+                                )
+                            }
                         }
                     }
                 } header: {
                     HStack {
-                        Image(systemName: "square.grid.2x2.fill")
+                        Image(systemName: dimensionIcon)
                             .font(.caption)
-                        Text("按类型统计")
-                    }
-                }
-                .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 4, trailing: 16))
-            }
-            
-            if !viewModel.ownerStatistics.isEmpty {
-                Section {
-                    Picker("", selection: $ownerTab) {
-                        ForEach(TransactionTypeTab.allCases, id: \.self) { tab in
-                            Text(tab.rawValue).tag(tab)
-                        }
-                    }
-                    .pickerStyle(.segmented)
-                    .listRowBackground(Color.clear)
-                    
-                    if filteredOwnerStatistics.isEmpty {
-                        HStack {
-                            Spacer()
-                            Text("暂无数据")
-                                .font(.subheadline)
-                                .foregroundColor(.secondary)
-                            Spacer()
-                        }
-                        .padding(.vertical, 8)
-                    } else {
-                        ForEach(filteredOwnerStatistics, id: \.key) { item in
-                            Button(action: {
-                                showBillsForOwner(name: item.key)
-                            }) {
-                                HStack(spacing: 10) {
-                                    // 归属人图标
-                                    Image(systemName: "person.fill")
-                                        .font(.system(size: 12))
-                                        .foregroundColor(.green.opacity(0.7))
-                                    
-                                    Text(item.key)
-                                        .font(.system(size: 15))
-                                        .foregroundColor(.primary)
-                                    
-                                    Spacer()
-                                    
-                                    Text("\(item.value as NSDecimalNumber)")
-                                        .font(.system(size: 15, weight: .medium))
-                                        .foregroundColor(colorForTab(ownerTab))
-                                    
-                                    Image(systemName: "chevron.right")
-                                        .font(.system(size: 12))
-                                        .foregroundColor(.secondary)
-                                }
-                                .padding(.vertical, 6)
-                                .padding(.horizontal, 10)
-                                .background(colorForTab(ownerTab).opacity(0.05))
-                                .cornerRadius(6)
-                            }
-                            .buttonStyle(.plain)
-                        }
-                    }
-                } header: {
-                    HStack {
-                        Image(systemName: "person.2.fill")
-                            .font(.caption)
-                        Text("按归属人统计")
-                    }
-                }
-                .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 4, trailing: 16))
-            }
-            
-            if !viewModel.paymentMethodStatistics.isEmpty {
-                Section {
-                    Picker("", selection: $paymentTab) {
-                        ForEach(TransactionTypeTab.allCases, id: \.self) { tab in
-                            Text(tab.rawValue).tag(tab)
-                        }
-                    }
-                    .pickerStyle(.segmented)
-                    .listRowBackground(Color.clear)
-                    
-                    if filteredPaymentStatistics.isEmpty {
-                        HStack {
-                            Spacer()
-                            Text("暂无数据")
-                                .font(.subheadline)
-                                .foregroundColor(.secondary)
-                            Spacer()
-                        }
-                        .padding(.vertical, 8)
-                    } else {
-                        ForEach(filteredPaymentStatistics, id: \.key) { item in
-                            Button(action: {
-                                showBillsForPaymentMethod(displayName: item.key)
-                            }) {
-                                HStack(spacing: 10) {
-                                    // 支付方式图标
-                                    Image(systemName: "creditcard.fill")
-                                        .font(.system(size: 12))
-                                        .foregroundColor(.blue.opacity(0.7))
-                                    
-                                    Text(item.key)
-                                        .font(.system(size: 15))
-                                        .foregroundColor(.primary)
-                                    
-                                    Spacer()
-                                    
-                                    Text("\(item.value as NSDecimalNumber)")
-                                        .font(.system(size: 15, weight: .medium))
-                                        .foregroundColor(colorForTab(paymentTab))
-                                    
-                                    Image(systemName: "chevron.right")
-                                        .font(.system(size: 12))
-                                        .foregroundColor(.secondary)
-                                }
-                                .padding(.vertical, 6)
-                                .padding(.horizontal, 10)
-                                .background(colorForTab(paymentTab).opacity(0.05))
-                                .cornerRadius(6)
-                            }
-                            .buttonStyle(.plain)
-                        }
-                    }
-                } header: {
-                    HStack {
-                        Image(systemName: "creditcard.and.123")
-                            .font(.caption)
-                        Text("按支付方式统计")
+                        Text("按\(selectedDimensionTab.rawValue)统计-\(transactionTypeTab.rawValue)")
                     }
                 }
                 .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 4, trailing: 16))
@@ -484,15 +378,15 @@ struct StatisticsView: View {
     // MARK: - Filtered Statistics
     
     private var filteredCategoryStatistics: [(key: String, value: Decimal)] {
-        filterStatistics(viewModel.categoryStatistics, by: categoryTab, type: .category)
+        filterStatistics(viewModel.categoryStatistics, by: transactionTypeTab, type: .category)
     }
     
     private var filteredOwnerStatistics: [(key: String, value: Decimal)] {
-        filterStatistics(viewModel.ownerStatistics, by: ownerTab, type: .owner)
+        filterStatistics(viewModel.ownerStatistics, by: transactionTypeTab, type: .owner)
     }
     
     private var filteredPaymentStatistics: [(key: String, value: Decimal)] {
-        filterStatistics(viewModel.paymentMethodStatistics, by: paymentTab, type: .payment)
+        filterStatistics(viewModel.paymentMethodStatistics, by: transactionTypeTab, type: .payment)
     }
     
     private func filterStatistics(_ stats: [String: [TransactionType: Decimal]], by tab: TransactionTypeTab, type: StatisticsType) -> [(key: String, value: Decimal)] {
@@ -542,24 +436,77 @@ struct StatisticsView: View {
     // MARK: - 显示账单详情
     
     private func showBillsForCategory(name: String) {
-        let transactionType = transactionTypeForTab(categoryTab)
+        let transactionType = transactionTypeForTab(transactionTypeTab)
         billListBills = viewModel.getBillsForCategory(name: name, transactionType: transactionType)
-        billListTitle = "\(name) - \(categoryTab.rawValue)"
+        billListTitle = "\(name) - \(transactionTypeTab.rawValue)"
         showingBillList = true
     }
     
     private func showBillsForOwner(name: String) {
-        let transactionType = transactionTypeForTab(ownerTab)
+        let transactionType = transactionTypeForTab(transactionTypeTab)
         billListBills = viewModel.getBillsForOwner(name: name, transactionType: transactionType)
-        billListTitle = "\(name) - \(ownerTab.rawValue)"
+        billListTitle = "\(name) - \(transactionTypeTab.rawValue)"
         showingBillList = true
     }
     
     private func showBillsForPaymentMethod(displayName: String) {
-        let transactionType = transactionTypeForTab(paymentTab)
+        let transactionType = transactionTypeForTab(transactionTypeTab)
         billListBills = viewModel.getBillsForPaymentMethod(displayName: displayName, transactionType: transactionType)
-        billListTitle = "\(displayName) - \(paymentTab.rawValue)"
+        billListTitle = "\(displayName) - \(transactionTypeTab.rawValue)"
         showingBillList = true
+    }
+    
+    // MARK: - 辅助视图和属性
+    
+    private var emptyDataView: some View {
+        HStack {
+            Spacer()
+            Text("暂无数据")
+                .font(.subheadline)
+                .foregroundColor(.secondary)
+            Spacer()
+        }
+        .padding(.vertical, 8)
+    }
+    
+    private var dimensionIcon: String {
+        switch selectedDimensionTab {
+        case .category:
+            return "square.grid.2x2.fill"
+        case .owner:
+            return "person.2.fill"
+        case .payment:
+            return "creditcard.and.123"
+        }
+    }
+    
+    private func statisticsRowButton(icon: String, iconColor: Color, name: String, value: Decimal, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            HStack(spacing: 10) {
+                Image(systemName: icon)
+                    .font(.system(size: 12))
+                    .foregroundColor(iconColor.opacity(0.7))
+                
+                Text(name)
+                    .font(.system(size: 15))
+                    .foregroundColor(.primary)
+                
+                Spacer()
+                
+                Text("\(value as NSDecimalNumber)")
+                    .font(.system(size: 15, weight: .medium))
+                    .foregroundColor(colorForTab(transactionTypeTab))
+                
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 12))
+                    .foregroundColor(.secondary)
+            }
+            .padding(.vertical, 6)
+            .padding(.horizontal, 10)
+            .background(colorForTab(transactionTypeTab).opacity(0.05))
+            .cornerRadius(6)
+        }
+        .buttonStyle(.plain)
     }
     
     enum StatisticsType {
