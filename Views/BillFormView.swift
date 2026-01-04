@@ -68,6 +68,7 @@ struct BillFormView: View {
     @State private var showingUpgradePrompt = false
     @State private var showingDatePicker = false
     @State private var recentNotes: [String] = []
+    @State private var isLoadingBillData = false  // 标志位：是否正在加载账单数据
     @FocusState private var isAmountFocused: Bool
     @FocusState private var isNoteFocused: Bool
     
@@ -89,21 +90,27 @@ struct BillFormView: View {
         NavigationView {
             VStack(spacing: 0) {
                 // Tab 选择器
-                Picker("交易类型", selection: $selectedTransactionType) {
+                Picker("交易类型", selection: Binding(
+                    get: { selectedTransactionType },
+                    set: { newValue in
+                        // 只有在非加载数据时才清空选择
+                        if !isLoadingBillData && selectedTransactionType != newValue {
+                            hideKeyboard()
+                            selectedPaymentMethodId = nil
+                            selectedCategoryIds.removeAll()
+                        }
+                        selectedTransactionType = newValue
+                    }
+                )) {
                     Text("支出").tag(TransactionType.expense)
                     Text("收入").tag(TransactionType.income)
                     Text("不计入").tag(TransactionType.excluded)
                 }
                 .pickerStyle(.segmented)
                 .padding()
-                .onChange(of: selectedTransactionType) { _ in
-                    // 切换Tab时清空选择并隐藏键盘
-                    hideKeyboard()
-                    selectedPaymentMethodId = nil
-                    selectedCategoryIds.removeAll()
-                }
                 .onChange(of: selectedOwnerId) { _ in
-                    // 切换归属人时，如果当前选择的支付方式不在过滤后的列表中，清空选择
+                    // 切换归属人时，如果当前选择的支付方式不在过滤后的列表中，清空选择（仅在非加载数据时）
+                    guard !isLoadingBillData else { return }
                     if let selectedId = selectedPaymentMethodId,
                        !filteredPaymentMethods.contains(where: { $0.id == selectedId }) {
                         selectedPaymentMethodId = nil
@@ -191,12 +198,9 @@ struct BillFormView: View {
                                     .foregroundColor(.primary)
                                     .padding(.top, 8)
                                 
-                                if filteredPaymentMethods.isEmpty {
-                                    Text("该归属人暂无可用的支付方式")
-                                        .foregroundColor(.secondary)
-                                        .font(.caption)
-                                } else if let selectedId = selectedPaymentMethodId,
-                                          let selected = filteredPaymentMethods.first(where: { $0.id == selectedId }) {
+                                if let selectedId = selectedPaymentMethodId,
+                                   let selected = paymentMethods.first(where: { $0.id == selectedId }) {
+                                    // 已选中：从完整列表中查找（编辑模式下可能不在过滤列表中）
                                     SelectableTagView(
                                         text: displayPaymentMethodName(selected.name),
                                         isSelected: true,
@@ -205,6 +209,10 @@ struct BillFormView: View {
                                         hideKeyboard()
                                         selectedPaymentMethodId = nil
                                     }
+                                } else if filteredPaymentMethods.isEmpty {
+                                    Text("该归属人暂无可用的支付方式")
+                                        .foregroundColor(.secondary)
+                                        .font(.caption)
                                 } else {
                                     FlowLayoutView(spacing: 8) {
                                         ForEach(filteredPaymentMethods, id: \.id) { method in
@@ -233,32 +241,30 @@ struct BillFormView: View {
                                 .foregroundColor(.primary)
                                 .padding(.top, 8)
                             
-                            if filteredCategories.isEmpty {
-                                Text("暂无\(transactionTypeText)类型的账单类型")
-                                    .foregroundColor(.secondary)
-                                    .font(.caption)
-                            } else {
-                                // 已选中的标签（水平排列小标签）
-                                if !selectedCategoryIds.isEmpty {
-                                    ScrollView(.horizontal, showsIndicators: false) {
-                                        HStack(spacing: 8) {
-                                            ForEach(filteredCategories.filter { selectedCategoryIds.contains($0.id) }) { category in
-                                                SelectableTagView(
-                                                    text: category.name,
-                                                    isSelected: true,
-                                                    color: .orange
-                                                ) {
-                                                    hideKeyboard()
-                                                    selectedCategoryIds.remove(category.id)
-                                                }
+                            // 已选中的标签（从完整列表中查找，编辑模式下可能不在过滤列表中）
+                            let selectedCategories = categories.filter { selectedCategoryIds.contains($0.id) }
+                            if !selectedCategories.isEmpty {
+                                ScrollView(.horizontal, showsIndicators: false) {
+                                    HStack(spacing: 8) {
+                                        ForEach(selectedCategories) { category in
+                                            SelectableTagView(
+                                                text: category.name,
+                                                isSelected: true,
+                                                color: .orange
+                                            ) {
+                                                hideKeyboard()
+                                                selectedCategoryIds.remove(category.id)
                                             }
                                         }
                                     }
                                 }
-                                
-                                // 未选中的标签
+                            }
+                            
+                            // 未选中的标签（从过滤后的列表中显示）
+                            let unselectedCategories = filteredCategories.filter { !selectedCategoryIds.contains($0.id) }
+                            if !unselectedCategories.isEmpty {
                                 FlowLayoutView(spacing: 8) {
-                                    ForEach(filteredCategories.filter { !selectedCategoryIds.contains($0.id) }) { category in
+                                    ForEach(unselectedCategories) { category in
                                         SelectableTagView(
                                             text: category.name,
                                             isSelected: false,
@@ -269,6 +275,10 @@ struct BillFormView: View {
                                         }
                                     }
                                 }
+                            } else if selectedCategories.isEmpty {
+                                Text("暂无\(transactionTypeText)类型的账单类型")
+                                    .foregroundColor(.secondary)
+                                    .font(.caption)
                             }
                         }
                         .padding(.bottom, 8)
@@ -284,20 +294,19 @@ struct BillFormView: View {
                             ScrollView(.horizontal, showsIndicators: false) {
                                 HStack(spacing: 8) {
                                     ForEach(recentNotes, id: \.self) { recentNote in
-                                        Button(action: {
-                                            note = recentNote
-                                            hideKeyboard()
-                                        }) {
-                                            Text(recentNote)
-                                                .font(.caption)
-                                                .lineLimit(1)
-                                                .padding(.horizontal, 10)
-                                                .padding(.vertical, 6)
-                                                .background(Color.gray.opacity(0.15))
-                                                .foregroundColor(.primary)
-                                                .cornerRadius(12)
-                                        }
-                                        .buttonStyle(.plain)
+                                        Text(recentNote)
+                                            .font(.caption)
+                                            .lineLimit(1)
+                                            .padding(.horizontal, 10)
+                                            .padding(.vertical, 6)
+                                            .background(Color.gray.opacity(0.15))
+                                            .foregroundColor(.primary)
+                                            .cornerRadius(12)
+                                            .contentShape(Rectangle())
+                                            .onTapGesture {
+                                                note = recentNote
+                                                hideKeyboard()
+                                            }
                                     }
                                 }
                             }
@@ -344,9 +353,15 @@ struct BillFormView: View {
                 Text(errorMessage)
             }
             .onAppear {
-                // 如果是编辑模式，填充数据
+                // 如果是编辑模式，填充数据（延迟执行以确保 onChange 不会干扰）
                 if let bill = editingBill {
-                    loadBillData(bill)
+                    isLoadingBillData = true
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                        loadBillData(bill)
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                            isLoadingBillData = false
+                        }
+                    }
                 } else {
                     // 页面出现时自动聚焦到金额输入框
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
@@ -555,8 +570,42 @@ struct BillFormView: View {
     }
     
     private func loadBillData(_ bill: Bill) {
+        // 先判断交易类型（需要在填充其他数据之前设置，因为filteredCategories依赖它）
+        // 根据账单的类型来判断交易类型
+        let billCategories = bill.categoryIds.compactMap { categoryId in
+            categories.first(where: { $0.id == categoryId })
+        }
+        
+        if !billCategories.isEmpty {
+            // 如果所有类型都是不计入，则为不计入
+            if billCategories.allSatisfy({ $0.transactionType == .excluded }) {
+                selectedTransactionType = .excluded
+            } else if billCategories.allSatisfy({ $0.transactionType == .income }) {
+                selectedTransactionType = .income
+            } else if billCategories.allSatisfy({ $0.transactionType == .expense }) {
+                selectedTransactionType = .expense
+            } else {
+                // 混合类型，根据金额判断
+                if bill.amount > 0 {
+                    selectedTransactionType = .income
+                } else {
+                    selectedTransactionType = .expense
+                }
+            }
+        } else {
+            // 没有类型信息，根据金额判断
+            if bill.amount > 0 {
+                selectedTransactionType = .income
+            } else {
+                selectedTransactionType = .expense
+            }
+        }
+        
         // 填充金额
         amount = String(describing: abs(bill.amount))
+        
+        // 填充归属人（需要在支付方式之前设置）
+        selectedOwnerId = bill.ownerId
         
         // 填充支付方式
         selectedPaymentMethodId = bill.paymentMethodId
@@ -564,19 +613,11 @@ struct BillFormView: View {
         // 填充账单类型
         selectedCategoryIds = Set(bill.categoryIds)
         
-        // 填充归属人
-        selectedOwnerId = bill.ownerId
-        
         // 填充备注
         note = bill.note ?? ""
         
         // 填充日期
         selectedDate = bill.createdAt
-        
-        // 判断交易类型
-        if let paymentMethod = paymentMethods.first(where: { $0.id == bill.paymentMethodId }) {
-            selectedTransactionType = paymentMethod.transactionType
-        }
     }
     
     /// 加载最近备注
@@ -633,16 +674,8 @@ struct SelectableTagView: View {
     let onTap: () -> Void
     
     var body: some View {
-        Button(action: onTap) {
-            HStack(spacing: 3) {
-                Text(text)
-                    .font(.footnote)
-                
-                if isSelected {
-                    Image(systemName: "xmark.circle.fill")
-                        .font(.system(size: 11))
-                }
-            }
+        Text(text)
+            .font(.footnote)
             .padding(.horizontal, 10)
             .padding(.vertical, 6)
             .background(isSelected ? color : color.opacity(0.2))
@@ -652,8 +685,18 @@ struct SelectableTagView: View {
                 RoundedRectangle(cornerRadius: 12)
                     .stroke(color, lineWidth: isSelected ? 0 : 1)
             )
-        }
-        .buttonStyle(.plain)
+            .overlay(alignment: .trailing) {
+                if isSelected {
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.system(size: 11))
+                        .foregroundColor(.white)
+                        .padding(.trailing, 4)
+                }
+            }
+            .contentShape(Rectangle())
+            .onTapGesture {
+                onTap()
+            }
     }
 }
 

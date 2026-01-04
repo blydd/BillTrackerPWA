@@ -51,12 +51,12 @@ class ExportViewModel: ObservableObject {
         }
         
         // 创建字典以便快速查找
-        let categoryDict = Dictionary(uniqueKeysWithValues: categories.map { ($0.id, $0.name) })
+        let categoryDict = Dictionary(uniqueKeysWithValues: categories.map { ($0.id, $0) })
         let ownerDict = Dictionary(uniqueKeysWithValues: owners.map { ($0.id, $0.name) })
         let paymentMethodDict = Dictionary(uniqueKeysWithValues: paymentMethods.map { ($0.id, $0.name) })
         
-        // 创建CSV内容
-        var csvContent = "日期,金额,账单类型,归属人,支付方式,备注\n"
+        // 创建CSV内容（添加交易类型列）
+        var csvContent = "日期,金额,交易类型,账单类型,归属人,支付方式,备注\n"
         
         let dateFormatter = DateFormatter()
         dateFormatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
@@ -69,8 +69,20 @@ class ExportViewModel: ObservableObject {
             // 格式化日期
             let dateString = dateFormatter.string(from: bill.createdAt)
             
-            // 获取账单类型名称
-            let categoryNames = bill.categoryIds.compactMap { categoryDict[$0] }.joined(separator: "; ")
+            // 获取账单类型名称和判断交易类型
+            let billCategories = bill.categoryIds.compactMap { categoryDict[$0] }
+            let categoryNames = billCategories.map { $0.name }.joined(separator: "; ")
+            
+            // 判断交易类型
+            let transactionType: String
+            let isExcluded = !billCategories.isEmpty && billCategories.allSatisfy { $0.transactionType == .excluded }
+            if isExcluded {
+                transactionType = "不计入"
+            } else if bill.amount > 0 {
+                transactionType = "收入"
+            } else {
+                transactionType = "支出"
+            }
             
             // 获取归属人名称
             let ownerName = ownerDict[bill.ownerId] ?? "未知"
@@ -81,8 +93,8 @@ class ExportViewModel: ObservableObject {
             // 获取备注
             let note = bill.note ?? ""
             
-            // 添加行数据 (Requirement 12.2)
-            let row = "\(dateString),\(bill.amount),\(categoryNames),\(ownerName),\(paymentMethodName),\(note)\n"
+            // 添加行数据（包含交易类型）
+            let row = "\(dateString),\(bill.amount),\(transactionType),\(categoryNames),\(ownerName),\(paymentMethodName),\(note)\n"
             csvContent += row
         }
         
@@ -90,7 +102,9 @@ class ExportViewModel: ObservableObject {
         
         // 保存到临时文件
         let tempDir = FileManager.default.temporaryDirectory
-        let fileName = "bills_export_\(Date().timeIntervalSince1970).csv"
+        let fileNameFormatter = DateFormatter()
+        fileNameFormatter.dateFormat = "yyyyMMddHHmmss"
+        let fileName = "bills_export_\(fileNameFormatter.string(from: Date())).csv"
         let fileURL = tempDir.appendingPathComponent(fileName)
         
         do {
@@ -128,9 +142,9 @@ class ExportViewModel: ObservableObject {
             throw ImportError.invalidFormat("文件为空或格式不正确")
         }
         
-        // 检查CSV头部
+        // 检查CSV头部（支持新旧两种格式）
         let header = lines[0]
-        let expectedHeader = "日期,金额,账单类型,归属人,支付方式,备注"
+        let hasTransactionType = header.contains("交易类型")
         guard header.contains("日期") && header.contains("金额") else {
             throw ImportError.invalidFormat("CSV文件格式不正确，缺少必要的列")
         }
@@ -183,6 +197,7 @@ class ExportViewModel: ObservableObject {
                 let bill = try await parseBillFromCSVLine(
                     line: line,
                     dateFormatter: dateFormatter,
+                    hasTransactionType: hasTransactionType,
                     categoryDict: categoryDict,
                     ownerDict: ownerDict,
                     paymentMethodDict: paymentMethodDict,
@@ -238,6 +253,7 @@ class ExportViewModel: ObservableObject {
     private func parseBillFromCSVLine(
         line: String,
         dateFormatter: DateFormatter,
+        hasTransactionType: Bool,
         categoryDict: [String: BillCategory],
         ownerDict: [String: Owner],
         paymentMethodDict: [String: PaymentMethodWrapper],
@@ -246,22 +262,51 @@ class ExportViewModel: ObservableObject {
         createdPaymentMethods: inout [PaymentMethodWrapper]
     ) async throws -> Bill {
         let components = parseCSVLine(line)
-        guard components.count >= 6 else {
+        
+        // 根据是否有交易类型列，确定最小列数
+        let minColumns = hasTransactionType ? 7 : 6
+        guard components.count >= minColumns else {
             throw ImportError.invalidFormat("行数据列数不足: \(line)")
         }
         
+        // 根据格式解析不同位置的数据
+        let dateIndex = 0
+        let amountIndex = 1
+        let transactionTypeIndex = hasTransactionType ? 2 : -1
+        let categoryIndex = hasTransactionType ? 3 : 2
+        let ownerIndex = hasTransactionType ? 4 : 3
+        let paymentMethodIndex = hasTransactionType ? 5 : 4
+        let noteIndex = hasTransactionType ? 6 : 5
+        
         // 解析日期
-        guard let date = dateFormatter.date(from: components[0]) else {
-            throw ImportError.invalidFormat("日期格式错误: \(components[0])")
+        guard let date = dateFormatter.date(from: components[dateIndex]) else {
+            throw ImportError.invalidFormat("日期格式错误: \(components[dateIndex])")
         }
         
         // 解析金额
-        guard let amount = Decimal(string: components[1]) else {
-            throw ImportError.invalidFormat("金额格式错误: \(components[1])")
+        guard var amount = Decimal(string: components[amountIndex]) else {
+            throw ImportError.invalidFormat("金额格式错误: \(components[amountIndex])")
+        }
+        
+        // 解析交易类型（如果有）
+        var transactionType: TransactionType = .expense
+        if hasTransactionType && transactionTypeIndex >= 0 {
+            let typeStr = components[transactionTypeIndex]
+            switch typeStr {
+            case "收入":
+                transactionType = .income
+            case "不计入":
+                transactionType = .excluded
+            default:
+                transactionType = .expense
+            }
+        } else {
+            // 旧格式：根据金额正负判断
+            transactionType = amount > 0 ? .income : .expense
         }
         
         // 处理账单类型
-        let categoryNames = components[2].components(separatedBy: "; ").filter { !$0.isEmpty }
+        let categoryNames = components[categoryIndex].components(separatedBy: "; ").filter { !$0.isEmpty }
         var categoryIds: [UUID] = []
         
         for categoryName in categoryNames {
@@ -270,15 +315,15 @@ class ExportViewModel: ObservableObject {
             } else if let createdCategory = createdCategories.first(where: { $0.name == categoryName }) {
                 categoryIds.append(createdCategory.id)
             } else {
-                // 创建新类别
-                let newCategory = BillCategory(name: categoryName, createdAt: Date(), updatedAt: Date())
+                // 创建新类别，使用解析出的交易类型
+                let newCategory = BillCategory(name: categoryName, transactionType: transactionType, createdAt: Date(), updatedAt: Date())
                 createdCategories.append(newCategory)
                 categoryIds.append(newCategory.id)
             }
         }
         
         // 处理归属人
-        let ownerName = components[3]
+        let ownerName = components[ownerIndex]
         let ownerId: UUID
         if let existingOwner = ownerDict[ownerName] {
             ownerId = existingOwner.id
@@ -292,7 +337,7 @@ class ExportViewModel: ObservableObject {
         }
         
         // 处理支付方式
-        let paymentMethodName = components[4]
+        let paymentMethodName = components[paymentMethodIndex]
         let paymentMethodId: UUID
         if let existingPaymentMethod = paymentMethodDict[paymentMethodName] {
             paymentMethodId = existingPaymentMethod.id
@@ -311,7 +356,7 @@ class ExportViewModel: ObservableObject {
         }
         
         // 备注
-        let note = components.count > 5 ? components[5] : nil
+        let note = components.count > noteIndex ? components[noteIndex] : nil
         
         return Bill(
             amount: amount,
