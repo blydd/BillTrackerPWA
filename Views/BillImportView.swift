@@ -97,12 +97,9 @@ struct BillImportView: View {
                             .font(.subheadline)
                     }
                     
-                    HStack {
-                        Image(systemName: "doc.richtext.fill")
-                            .foregroundColor(.green)
-                        Text("Excel 文件 (.xlsx, .xls)")
-                            .font(.subheadline)
-                    }
+                    Text("提示：如果是 Excel 文件，请先另存为 CSV 格式")
+                        .font(.caption)
+                        .foregroundColor(.orange)
                 }
             }
             
@@ -191,7 +188,7 @@ struct BillImportView: View {
         .navigationBarTitleDisplayMode(.inline)
         .fileImporter(
             isPresented: $showingFilePicker,
-            allowedContentTypes: [.commaSeparatedText, .spreadsheet, .data],
+            allowedContentTypes: [.commaSeparatedText],
             allowsMultipleSelection: false
         ) { result in
             handleFileSelection(result)
@@ -223,7 +220,17 @@ struct BillImportView: View {
         case .success(let urls):
             guard let fileURL = urls.first else { return }
             
+            // 获取安全作用域访问权限
+            let accessing = fileURL.startAccessingSecurityScopedResource()
+            
             Task {
+                defer {
+                    // 确保在完成后释放访问权限
+                    if accessing {
+                        fileURL.stopAccessingSecurityScopedResource()
+                    }
+                }
+                
                 do {
                     let result = try await exportViewModel.importFromCSV(fileURL: fileURL)
                     await MainActor.run {

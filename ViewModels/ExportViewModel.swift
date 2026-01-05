@@ -128,25 +128,56 @@ class ExportViewModel: ObservableObject {
             importProgress = 0.0
         }
         
+        // 检查文件扩展名
+        let fileExtension = fileURL.pathExtension.lowercased()
+        if fileExtension == "xlsx" || fileExtension == "xls" {
+            throw ImportError.invalidFormat("暂不支持 Excel 文件格式，请将文件另存为 CSV 格式后再导入")
+        }
+        
         // 读取CSV文件内容
         let csvContent: String
         do {
-            csvContent = try String(contentsOf: fileURL, encoding: .utf8)
-        } catch {
-            throw ImportError.fileReadFailed(error.localizedDescription)
+            // 尝试多种编码读取
+            if let content = try? String(contentsOf: fileURL, encoding: .utf8) {
+                csvContent = content
+            } else if let data = try? Data(contentsOf: fileURL),
+                      let content = String(data: data, encoding: String.Encoding(rawValue: CFStringConvertEncodingToNSStringEncoding(CFStringEncoding(CFStringEncodings.GB_18030_2000.rawValue)))) {
+                // 尝试 GBK/GB18030 编码（中文 Windows 默认编码）
+                csvContent = content
+            } else if let data = try? Data(contentsOf: fileURL),
+                      let content = String(data: data, encoding: .utf16) {
+                csvContent = content
+            } else if let data = try? Data(contentsOf: fileURL),
+                      let content = String(data: data, encoding: .ascii) {
+                csvContent = content
+            } else {
+                throw ImportError.fileReadFailed("无法读取文件，请尝试将文件另存为 UTF-8 编码的 CSV 格式")
+            }
+        }
+        
+        // 检查是否为空文件
+        let trimmedContent = csvContent.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmedContent.isEmpty {
+            throw ImportError.invalidFormat("文件内容为空")
         }
         
         // 解析CSV内容
         let lines = csvContent.components(separatedBy: .newlines)
         guard lines.count > 1 else {
-            throw ImportError.invalidFormat("文件为空或格式不正确")
+            throw ImportError.invalidFormat("文件只有标题行，没有数据")
         }
         
         // 检查CSV头部（支持新旧两种格式）
         let header = lines[0]
         let hasTransactionType = header.contains("交易类型")
-        guard header.contains("日期") && header.contains("金额") else {
-            throw ImportError.invalidFormat("CSV文件格式不正确，缺少必要的列")
+        
+        // 检查是否包含必要的列
+        if !header.contains("日期") || !header.contains("金额") {
+            // 可能是 Excel 导出的格式，检查是否有乱码
+            if header.contains("\u{FEFF}") || header.first?.isASCII == false {
+                throw ImportError.invalidFormat("文件编码格式不正确，请使用 UTF-8 编码保存 CSV 文件")
+            }
+            throw ImportError.invalidFormat("CSV 文件缺少必要的列（日期、金额），请检查文件格式是否正确\n\n当前标题行：\(header.prefix(100))")
         }
         
         // 获取现有数据用于去重和关联
@@ -278,9 +309,33 @@ class ExportViewModel: ObservableObject {
         let paymentMethodIndex = hasTransactionType ? 5 : 4
         let noteIndex = hasTransactionType ? 6 : 5
         
-        // 解析日期
-        guard let date = dateFormatter.date(from: components[dateIndex]) else {
-            throw ImportError.invalidFormat("日期格式错误: \(components[dateIndex])")
+        // 解析日期（支持多种格式）
+        var date: Date?
+        let dateString = components[dateIndex]
+        
+        // 尝试多种日期格式
+        let dateFormats = [
+            "yyyy-MM-dd HH:mm:ss",
+            "yyyy/M/d HH:mm",
+            "yyyy/M/d H:mm",
+            "yyyy-M-d HH:mm:ss",
+            "yyyy-M-d HH:mm",
+            "yyyy/MM/dd HH:mm:ss",
+            "yyyy/MM/dd HH:mm"
+        ]
+        
+        for format in dateFormats {
+            let formatter = DateFormatter()
+            formatter.dateFormat = format
+            formatter.locale = Locale(identifier: "zh_CN")
+            if let parsedDate = formatter.date(from: dateString) {
+                date = parsedDate
+                break
+            }
+        }
+        
+        guard let parsedDate = date else {
+            throw ImportError.invalidFormat("日期格式错误: \(dateString)，支持的格式如：2024-01-15 12:30:00 或 2024/1/15 12:30")
         }
         
         // 解析金额
@@ -364,8 +419,8 @@ class ExportViewModel: ObservableObject {
             categoryIds: categoryIds,
             ownerId: ownerId,
             note: note,
-            createdAt: date,
-            updatedAt: date
+            createdAt: parsedDate,
+            updatedAt: parsedDate
         )
     }
     
