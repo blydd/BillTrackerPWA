@@ -17,7 +17,8 @@ struct StatisticsBillListView: View {
     @State private var editingBill: Bill?
     @State private var showingError = false
     @State private var errorMessage: String?
-    @State private var localBills: [Bill]
+    @State private var localBills: [Bill] = []
+    @State private var isLoading = true  // 加载状态
     
     init(title: String, bills: [Bill], repository: DataRepository, onDismiss: @escaping () -> Void, onDataChanged: @escaping () -> Void) {
         self.title = title
@@ -29,13 +30,21 @@ struct StatisticsBillListView: View {
         _ownerViewModel = StateObject(wrappedValue: OwnerViewModel(repository: repository))
         _paymentViewModel = StateObject(wrappedValue: PaymentMethodViewModel(repository: repository))
         _billViewModel = StateObject(wrappedValue: BillViewModel(repository: repository))
-        _localBills = State(initialValue: bills)
     }
     
     var body: some View {
         NavigationView {
             Group {
-                if localBills.isEmpty {
+                if isLoading {
+                    // 加载中状态
+                    VStack(spacing: 16) {
+                        ProgressView()
+                            .scaleEffect(1.2)
+                        Text("加载中...")
+                            .font(.subheadline)
+                            .foregroundColor(.secondary)
+                    }
+                } else if localBills.isEmpty {
                     VStack(spacing: 16) {
                         Image(systemName: "doc.text")
                             .font(.system(size: 48))
@@ -112,8 +121,11 @@ struct StatisticsBillListView: View {
                     Text(error)
                 }
             }
-            .task {
-                await loadData()
+            .onAppear {
+                // 每次视图出现时重新加载数据
+                Task {
+                    await loadData()
+                }
             }
         }
     }
@@ -142,9 +154,14 @@ struct StatisticsBillListView: View {
     }
     
     private func loadData() async {
+        isLoading = true
+        // 先设置账单数据
+        localBills = bills
+        // 再加载关联数据
         await categoryViewModel.loadCategories()
         await ownerViewModel.loadOwners()
         await paymentViewModel.loadPaymentMethods()
+        isLoading = false
     }
     
     private func refreshData() async {

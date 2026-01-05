@@ -1,5 +1,12 @@
 import SwiftUI
 
+/// 账单列表详情数据
+struct BillListDetail: Identifiable {
+    let id = UUID()
+    let title: String
+    let bills: [Bill]
+}
+
 /// 统计视图
 struct StatisticsView: View {
     @StateObject private var viewModel: StatisticsViewModel
@@ -14,9 +21,7 @@ struct StatisticsView: View {
     @State private var dateSelectionMode: DateSelectionMode = .month
     
     // 账单详情弹窗状态
-    @State private var showingBillList = false
-    @State private var billListTitle = ""
-    @State private var billListBills: [Bill] = []
+    @State private var billListDetail: BillListDetail?
     
     private let repository: DataRepository
     
@@ -275,13 +280,13 @@ struct StatisticsView: View {
                 }
             )
         }
-        .sheet(isPresented: $showingBillList) {
+        .sheet(item: $billListDetail) { detail in
             StatisticsBillListView(
-                title: billListTitle,
-                bills: billListBills,
+                title: detail.title,
+                bills: detail.bills,
                 repository: repository,
                 onDismiss: {
-                    showingBillList = false
+                    billListDetail = nil
                 },
                 onDataChanged: {
                     // 数据变化后刷新统计
@@ -437,23 +442,20 @@ struct StatisticsView: View {
     
     private func showBillsForCategory(name: String) {
         let transactionType = transactionTypeForTab(transactionTypeTab)
-        billListBills = viewModel.getBillsForCategory(name: name, transactionType: transactionType)
-        billListTitle = "\(name) - \(transactionTypeTab.rawValue)"
-        showingBillList = true
+        let bills = viewModel.getBillsForCategory(name: name, transactionType: transactionType)
+        billListDetail = BillListDetail(title: "\(name) - \(transactionTypeTab.rawValue)", bills: bills)
     }
     
     private func showBillsForOwner(name: String) {
         let transactionType = transactionTypeForTab(transactionTypeTab)
-        billListBills = viewModel.getBillsForOwner(name: name, transactionType: transactionType)
-        billListTitle = "\(name) - \(transactionTypeTab.rawValue)"
-        showingBillList = true
+        let bills = viewModel.getBillsForOwner(name: name, transactionType: transactionType)
+        billListDetail = BillListDetail(title: "\(name) - \(transactionTypeTab.rawValue)", bills: bills)
     }
     
     private func showBillsForPaymentMethod(displayName: String) {
         let transactionType = transactionTypeForTab(transactionTypeTab)
-        billListBills = viewModel.getBillsForPaymentMethod(displayName: displayName, transactionType: transactionType)
-        billListTitle = "\(displayName) - \(transactionTypeTab.rawValue)"
-        showingBillList = true
+        let bills = viewModel.getBillsForPaymentMethod(displayName: displayName, transactionType: transactionType)
+        billListDetail = BillListDetail(title: "\(displayName) - \(transactionTypeTab.rawValue)", bills: bills)
     }
     
     // MARK: - 辅助视图和属性
