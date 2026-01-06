@@ -25,6 +25,7 @@ struct BillListView: View {
     @State private var selectedOwnerIds: Set<UUID> = []
     @State private var selectedCategoryIds: Set<UUID> = []
     @State private var selectedPaymentMethodIds: Set<UUID> = []
+    @State private var selectedTransactionTypes: Set<TransactionType> = []  // 交易类型筛选
     @State private var startDate: Date?
     @State private var endDate: Date?
     @State private var showingStartDatePicker = false
@@ -99,6 +100,13 @@ struct BillListView: View {
                     
                     if isFilterExpanded {
                         LazyVGrid(columns: [GridItem(.adaptive(minimum: 80))], spacing: 8) {
+                            // 交易类型筛选标签
+                            ForEach(Array(selectedTransactionTypes), id: \.self) { type in
+                                FilterTagView(text: transactionTypeName(type), color: .indigo) {
+                                    selectedTransactionTypes.remove(type)
+                                }
+                            }
+                            
                             // 归属人筛选标签
                             ForEach(Array(selectedOwnerIds), id: \.self) { ownerId in
                                 if let owner = ownerViewModel.owners.first(where: { $0.id == ownerId }) {
@@ -180,27 +188,23 @@ struct BillListView: View {
                                 )
                                 .swipeActions(edge: .trailing, allowsFullSwipe: true) {
                                     Button(role: .destructive) {
-                                        Task {
-                                            do {
-                                                print("🔴 UI: 开始删除账单 \(bill.id)")
-                                                try await billViewModel.deleteBill(bill)
-                                                print("✅ UI: 删除成功，重新加载数据")
-                                                
-                                                // 清除缓存
-                                                clearCache()
-                                                
-                                                // 重新加载所有数据
-                                                await loadData()
-                                                
-                                                print("✅ UI: 数据重载完成，当前账单数: \(billViewModel.bills.count)")
-                                            } catch {
-                                                print("❌ UI: 删除失败: \(error)")
-                                                billViewModel.errorMessage = "删除失败: \(error.localizedDescription)"
-                                                showingError = true
-                                            }
-                                        }
+                                        deleteBillAction(bill)
                                     } label: {
                                         Label("删除", systemImage: "trash")
+                                    }
+                                }
+                                // Mac 端支持右键菜单删除
+                                .contextMenu {
+                                    Button(role: .destructive) {
+                                        deleteBillAction(bill)
+                                    } label: {
+                                        Label("删除", systemImage: "trash")
+                                    }
+                                    
+                                    Button {
+                                        editingBill = bill
+                                    } label: {
+                                        Label("编辑", systemImage: "pencil")
                                     }
                                 }
                                 .listRowInsets(EdgeInsets(top: 3, leading: 12, bottom: 3, trailing: 12))
@@ -336,6 +340,7 @@ struct BillListView: View {
                 selectedOwnerIds: $selectedOwnerIds,
                 selectedCategoryIds: $selectedCategoryIds,
                 selectedPaymentMethodIds: $selectedPaymentMethodIds,
+                selectedTransactionTypes: $selectedTransactionTypes,
                 startDate: $startDate,
                 endDate: $endDate
             )
@@ -399,6 +404,27 @@ struct BillListView: View {
             bills = bills.filter { $0.createdAt <= endOfDay }
         }
         
+        // 按交易类型筛选
+        if !selectedTransactionTypes.isEmpty {
+            bills = bills.filter { bill in
+                let billCategories = bill.categoryIds.compactMap { categoryId in
+                    categoryViewModel.categories.first(where: { $0.id == categoryId })
+                }
+                let isExcluded = !billCategories.isEmpty && billCategories.allSatisfy { $0.transactionType == .excluded }
+                
+                let actualType: TransactionType
+                if isExcluded {
+                    actualType = .excluded
+                } else if bill.amount > 0 {
+                    actualType = .income
+                } else {
+                    actualType = .expense
+                }
+                
+                return selectedTransactionTypes.contains(actualType)
+            }
+        }
+        
         // 更新缓存
         DispatchQueue.main.async {
             cachedFilteredBills = bills
@@ -413,10 +439,11 @@ struct BillListView: View {
         let ownerKey = selectedOwnerIds.sorted().map { $0.uuidString }.joined(separator: ",")
         let categoryKey = selectedCategoryIds.sorted().map { $0.uuidString }.joined(separator: ",")
         let paymentKey = selectedPaymentMethodIds.sorted().map { $0.uuidString }.joined(separator: ",")
+        let transactionTypeKey = selectedTransactionTypes.map { $0.rawValue }.sorted().joined(separator: ",")
         let dateKey = "\(startDate?.timeIntervalSince1970 ?? 0)-\(endDate?.timeIntervalSince1970 ?? 0)"
         // 使用账单数量和最后更新时间作为缓存键的一部分
         let billsKey = "\(billViewModel.bills.count)-\(billViewModel.bills.map { $0.updatedAt.timeIntervalSince1970 }.max() ?? 0)"
-        return "\(ownerKey)|\(categoryKey)|\(paymentKey)|\(dateKey)|\(billsKey)"
+        return "\(ownerKey)|\(categoryKey)|\(paymentKey)|\(transactionTypeKey)|\(dateKey)|\(billsKey)"
     }
     
     // 分页显示的账单（确保同一天的账单完整显示）
@@ -492,7 +519,7 @@ struct BillListView: View {
     
     // 是否有激活的筛选条件
     private var hasActiveFilters: Bool {
-        !selectedOwnerIds.isEmpty || !selectedCategoryIds.isEmpty || !selectedPaymentMethodIds.isEmpty || startDate != nil || endDate != nil
+        !selectedOwnerIds.isEmpty || !selectedCategoryIds.isEmpty || !selectedPaymentMethodIds.isEmpty || !selectedTransactionTypes.isEmpty || startDate != nil || endDate != nil
     }
     
     // 日期范围文本
@@ -515,9 +542,36 @@ struct BillListView: View {
         selectedOwnerIds.removeAll()
         selectedCategoryIds.removeAll()
         selectedPaymentMethodIds.removeAll()
+        selectedTransactionTypes.removeAll()
         startDate = nil
         endDate = nil
         clearCache()
+    }
+    
+    // 交易类型名称
+    private func transactionTypeName(_ type: TransactionType) -> String {
+        switch type {
+        case .expense:
+            return "支出"
+        case .income:
+            return "收入"
+        case .excluded:
+            return "不计入"
+        }
+    }
+    
+    // 删除账单操作
+    private func deleteBillAction(_ bill: Bill) {
+        Task {
+            do {
+                try await billViewModel.deleteBill(bill)
+                clearCache()
+                await loadData()
+            } catch {
+                billViewModel.errorMessage = "删除失败: \(error.localizedDescription)"
+                showingError = true
+            }
+        }
     }
     
     // 加载更多账单
@@ -1237,6 +1291,7 @@ struct FilterSheetView: View {
     @Binding var selectedOwnerIds: Set<UUID>
     @Binding var selectedCategoryIds: Set<UUID>
     @Binding var selectedPaymentMethodIds: Set<UUID>
+    @Binding var selectedTransactionTypes: Set<TransactionType>
     @Binding var startDate: Date?
     @Binding var endDate: Date?
     
@@ -1272,6 +1327,32 @@ struct FilterSheetView: View {
             
             ScrollView {
                 VStack(alignment: .leading, spacing: 20) {
+                    // 交易类型筛选
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text("交易类型")
+                            .font(.headline)
+                            .padding(.horizontal)
+                        
+                        HStack(spacing: 12) {
+                            ForEach([TransactionType.expense, TransactionType.income, TransactionType.excluded], id: \.self) { type in
+                                SelectableFilterTag(
+                                    text: transactionTypeName(type),
+                                    isSelected: selectedTransactionTypes.contains(type),
+                                    color: .indigo
+                                ) {
+                                    if selectedTransactionTypes.contains(type) {
+                                        selectedTransactionTypes.remove(type)
+                                    } else {
+                                        selectedTransactionTypes.insert(type)
+                                    }
+                                }
+                            }
+                        }
+                        .padding(.horizontal)
+                    }
+                    
+                    Divider()
+                    
                     // 归属人筛选
                     VStack(alignment: .leading, spacing: 12) {
                         Text("归属人")
@@ -1472,6 +1553,18 @@ struct FilterSheetView: View {
             return String(name[startIndex...])
         }
         return name
+    }
+    
+    // 交易类型名称
+    private func transactionTypeName(_ type: TransactionType) -> String {
+        switch type {
+        case .expense:
+            return "支出"
+        case .income:
+            return "收入"
+        case .excluded:
+            return "不计入"
+        }
     }
     
     private func formatDate(_ date: Date) -> String {

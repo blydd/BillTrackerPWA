@@ -201,12 +201,8 @@ class ExportViewModel: ObservableObject {
             }
         }
         
-        var paymentMethodDict: [String: PaymentMethodWrapper] = [:]
-        for method in existingPaymentMethods {
-            if paymentMethodDict[method.name] == nil {
-                paymentMethodDict[method.name] = method
-            }
-        }
+        // 使用数组存储所有支付方式，避免同名不同归属人的支付方式被覆盖
+        let allPaymentMethods = existingPaymentMethods
         
         var importedBills: [Bill] = []
         var duplicateCount = 0
@@ -231,7 +227,7 @@ class ExportViewModel: ObservableObject {
                     hasTransactionType: hasTransactionType,
                     categoryDict: categoryDict,
                     ownerDict: ownerDict,
-                    paymentMethodDict: paymentMethodDict,
+                    allPaymentMethods: allPaymentMethods,
                     createdCategories: &createdCategories,
                     createdOwners: &createdOwners,
                     createdPaymentMethods: &createdPaymentMethods
@@ -262,9 +258,31 @@ class ExportViewModel: ObservableObject {
             try await repository.savePaymentMethod(paymentMethod)
         }
         
-        // 保存导入的账单
+        // 保存导入的账单并更新支付方式余额
+        // 使用字典跟踪每个支付方式的累计金额变化
+        var paymentMethodAmountChanges: [UUID: Decimal] = [:]
+        
         for bill in importedBills {
             try await repository.saveBill(bill)
+            
+            // 累计每个支付方式的金额变化
+            let currentChange = paymentMethodAmountChanges[bill.paymentMethodId] ?? 0
+            paymentMethodAmountChanges[bill.paymentMethodId] = currentChange + bill.amount
+        }
+        
+        // 批量更新支付方式余额
+        for (paymentMethodId, totalAmountChange) in paymentMethodAmountChanges {
+            // 从数据库获取最新的支付方式数据
+            if let paymentMethod = try await repository.fetchPaymentMethod(by: paymentMethodId) {
+                // 找到对应的归属人ID（从任意一笔使用该支付方式的账单中获取）
+                if let bill = importedBills.first(where: { $0.paymentMethodId == paymentMethodId }) {
+                    try await updatePaymentMethodBalance(
+                        paymentMethod: paymentMethod,
+                        amount: totalAmountChange,
+                        billOwnerId: bill.ownerId
+                    )
+                }
+            }
         }
         
         importProgress = 1.0
@@ -280,6 +298,29 @@ class ExportViewModel: ObservableObject {
         )
     }
     
+    /// 更新支付方式余额
+    private func updatePaymentMethodBalance(
+        paymentMethod: PaymentMethodWrapper,
+        amount: Decimal,
+        billOwnerId: UUID
+    ) async throws {
+        var updatedMethod = paymentMethod
+        
+        switch paymentMethod {
+        case .credit(var creditMethod):
+            // 信贷方式：支出增加欠费，收入减少欠费
+            creditMethod.outstandingBalance -= amount
+            updatedMethod = .credit(creditMethod)
+            
+        case .savings(var savingsMethod):
+            // 储蓄方式：支出减少余额，收入增加余额
+            savingsMethod.balance += amount
+            updatedMethod = .savings(savingsMethod)
+        }
+        
+        try await repository.updatePaymentMethod(updatedMethod)
+    }
+    
     /// 解析CSV行数据为账单对象
     private func parseBillFromCSVLine(
         line: String,
@@ -287,7 +328,7 @@ class ExportViewModel: ObservableObject {
         hasTransactionType: Bool,
         categoryDict: [String: BillCategory],
         ownerDict: [String: Owner],
-        paymentMethodDict: [String: PaymentMethodWrapper],
+        allPaymentMethods: [PaymentMethodWrapper],
         createdCategories: inout [BillCategory],
         createdOwners: inout [Owner],
         createdPaymentMethods: inout [PaymentMethodWrapper]
@@ -394,16 +435,41 @@ class ExportViewModel: ObservableObject {
         // 处理支付方式
         let paymentMethodName = components[paymentMethodIndex]
         let paymentMethodId: UUID
-        if let existingPaymentMethod = paymentMethodDict[paymentMethodName] {
+        
+        // 尝试多种方式匹配支付方式（优先匹配同一归属人的支付方式）：
+        // 1. 优先匹配 "归属人-支付方式名称" 格式（如 "男主-交通信用卡"）
+        // 2. 匹配支付方式名称部分（去掉归属人前缀后匹配），且归属人一致
+        // 3. 完全匹配名称且归属人一致
+        // 4. 从已创建的支付方式中查找（同一归属人）
+        let ownerNameForMatch = components[ownerIndex]
+        let fullName = "\(ownerNameForMatch)-\(paymentMethodName)"
+        
+        if let existingPaymentMethod = allPaymentMethods.first(where: { $0.name == fullName }) {
+            // 匹配 "归属人-支付方式名称" 格式
             paymentMethodId = existingPaymentMethod.id
-        } else if let createdPaymentMethod = createdPaymentMethods.first(where: { $0.name == paymentMethodName }) {
+        } else if let existingPaymentMethod = allPaymentMethods.first(where: { method in
+            // 匹配支付方式名称部分（去掉归属人前缀后匹配），且归属人一致
+            if method.name.contains("-") {
+                let parts = method.name.split(separator: "-", maxSplits: 1)
+                if parts.count == 2 {
+                    return String(parts[1]) == paymentMethodName && method.ownerId == ownerId
+                }
+            }
+            return false
+        }) {
+            paymentMethodId = existingPaymentMethod.id
+        } else if let existingPaymentMethod = allPaymentMethods.first(where: { $0.name == paymentMethodName && $0.ownerId == ownerId }) {
+            // 完全匹配名称且归属人一致
+            paymentMethodId = existingPaymentMethod.id
+        } else if let createdPaymentMethod = createdPaymentMethods.first(where: { $0.name == paymentMethodName && $0.ownerId == ownerId }) {
+            // 从已创建的支付方式中查找（同一归属人）
             paymentMethodId = createdPaymentMethod.id
         } else {
             // 创建新支付方式（默认为储蓄账户）
             let newPaymentMethod = PaymentMethodWrapper.savings(SavingsMethod(
                 name: paymentMethodName,
                 transactionType: .expense,
-                balance: Decimal(1000), // 默认余额
+                balance: Decimal(0), // 默认余额为0，导入时会更新
                 ownerId: ownerId
             ))
             createdPaymentMethods.append(newPaymentMethod)
