@@ -108,12 +108,31 @@ struct BillFormView: View {
                 }
                 .pickerStyle(.segmented)
                 .padding()
-                .onChange(of: selectedOwnerId) { _ in
-                    // 切换归属人时，如果当前选择的支付方式不在过滤后的列表中，清空选择（仅在非加载数据时）
+                .onChange(of: selectedOwnerId) { newOwnerId in
+                    // 切换归属人时，自动切换到新归属人的支付方式（仅在非加载数据时）
                     guard !isLoadingBillData else { return }
+                    guard let newOwnerId = newOwnerId else { return }
+                    
+                    // 获取当前选中的支付方式名称（去掉归属人前缀）
+                    var currentPaymentMethodBaseName: String? = nil
                     if let selectedId = selectedPaymentMethodId,
-                       !filteredPaymentMethods.contains(where: { $0.id == selectedId }) {
+                       let currentMethod = paymentMethods.first(where: { $0.id == selectedId }) {
+                        currentPaymentMethodBaseName = displayPaymentMethodName(currentMethod.name)
+                    }
+                    
+                    // 获取新归属人下的可用支付方式
+                    let newOwnerPaymentMethods = getFilteredPaymentMethods(for: newOwnerId)
+                    
+                    if newOwnerPaymentMethods.isEmpty {
+                        // 新归属人没有可用的支付方式，清空选择
                         selectedPaymentMethodId = nil
+                    } else if let baseName = currentPaymentMethodBaseName,
+                              let matchingMethod = newOwnerPaymentMethods.first(where: { displayPaymentMethodName($0.name) == baseName }) {
+                        // 找到新归属人下的同名支付方式，自动切换
+                        selectedPaymentMethodId = matchingMethod.id
+                    } else {
+                        // 没有同名支付方式，选择第一个可用的
+                        selectedPaymentMethodId = newOwnerPaymentMethods.first?.id
                     }
                 }
                 
@@ -160,30 +179,26 @@ struct BillFormView: View {
                                 .foregroundColor(.primary)
                                 .padding(.top, 8)
                             
-                            if let selectedId = selectedOwnerId,
-                               let selected = owners.first(where: { $0.id == selectedId }) {
-                                SelectableTagView(
-                                    text: selected.name,
-                                    isSelected: true,
-                                    color: .green
-                                ) {
-                                    hideKeyboard()
-                                    selectedOwnerId = nil
-                                }
-                            } else {
-                                FlowLayoutView(spacing: 8) {
-                                    ForEach(owners) { owner in
-                                        SelectableTagView(
-                                            text: owner.name,
-                                            isSelected: false,
-                                            color: .green
-                                        ) {
-                                            hideKeyboard()
+                            // 始终显示所有归属人选项，支持直接切换
+                            FlowLayoutView(spacing: 8) {
+                                ForEach(owners) { owner in
+                                    SelectableTagView(
+                                        text: owner.name,
+                                        isSelected: selectedOwnerId == owner.id,
+                                        color: .green
+                                    ) {
+                                        hideKeyboard()
+                                        if selectedOwnerId == owner.id {
+                                            // 点击已选中的归属人，取消选择
+                                            selectedOwnerId = nil
+                                        } else {
+                                            // 点击其他归属人，直接切换
                                             selectedOwnerId = owner.id
                                         }
                                     }
                                 }
                             }
+                            .allowsHitTesting(true)
                         }
                         .padding(.bottom, 8)
                     }
@@ -198,34 +213,29 @@ struct BillFormView: View {
                                     .foregroundColor(.primary)
                                     .padding(.top, 8)
                                 
-                                if let selectedId = selectedPaymentMethodId,
-                                   let selected = paymentMethods.first(where: { $0.id == selectedId }) {
-                                    // 已选中：从完整列表中查找（编辑模式下可能不在过滤列表中）
-                                    SelectableTagView(
-                                        text: displayPaymentMethodName(selected.name),
-                                        isSelected: true,
-                                        color: .blue
-                                    ) {
-                                        hideKeyboard()
-                                        selectedPaymentMethodId = nil
-                                    }
-                                } else if filteredPaymentMethods.isEmpty {
+                                if filteredPaymentMethods.isEmpty {
                                     Text("该归属人暂无可用的支付方式")
                                         .foregroundColor(.secondary)
                                         .font(.caption)
                                 } else {
+                                    // 始终显示所有支付方式选项，支持直接切换
                                     FlowLayoutView(spacing: 8) {
                                         ForEach(filteredPaymentMethods, id: \.id) { method in
                                             SelectableTagView(
                                                 text: displayPaymentMethodName(method.name),
-                                                isSelected: false,
+                                                isSelected: selectedPaymentMethodId == method.id,
                                                 color: .blue
                                             ) {
                                                 hideKeyboard()
-                                                selectedPaymentMethodId = method.id
+                                                if selectedPaymentMethodId == method.id {
+                                                    selectedPaymentMethodId = nil
+                                                } else {
+                                                    selectedPaymentMethodId = method.id
+                                                }
                                             }
                                         }
                                     }
+                                    .allowsHitTesting(true)
                                 }
                             }
                             .padding(.bottom, 8)
@@ -241,44 +251,29 @@ struct BillFormView: View {
                                 .foregroundColor(.primary)
                                 .padding(.top, 8)
                             
-                            // 已选中的标签（从完整列表中查找，编辑模式下可能不在过滤列表中）
-                            let selectedCategories = categories.filter { selectedCategoryIds.contains($0.id) }
-                            if !selectedCategories.isEmpty {
-                                ScrollView(.horizontal, showsIndicators: false) {
-                                    HStack(spacing: 8) {
-                                        ForEach(selectedCategories) { category in
-                                            SelectableTagView(
-                                                text: category.name,
-                                                isSelected: true,
-                                                color: .orange
-                                            ) {
-                                                hideKeyboard()
+                            if filteredCategories.isEmpty {
+                                Text("暂无\(transactionTypeText)类型的账单类型")
+                                    .foregroundColor(.secondary)
+                                    .font(.caption)
+                            } else {
+                                // 始终显示所有账单类型选项（多选）
+                                FlowLayoutView(spacing: 8) {
+                                    ForEach(filteredCategories) { category in
+                                        SelectableTagView(
+                                            text: category.name,
+                                            isSelected: selectedCategoryIds.contains(category.id),
+                                            color: .orange
+                                        ) {
+                                            hideKeyboard()
+                                            if selectedCategoryIds.contains(category.id) {
                                                 selectedCategoryIds.remove(category.id)
+                                            } else {
+                                                selectedCategoryIds.insert(category.id)
                                             }
                                         }
                                     }
                                 }
-                            }
-                            
-                            // 未选中的标签（从过滤后的列表中显示）
-                            let unselectedCategories = filteredCategories.filter { !selectedCategoryIds.contains($0.id) }
-                            if !unselectedCategories.isEmpty {
-                                FlowLayoutView(spacing: 8) {
-                                    ForEach(unselectedCategories) { category in
-                                        SelectableTagView(
-                                            text: category.name,
-                                            isSelected: false,
-                                            color: .orange
-                                        ) {
-                                            hideKeyboard()
-                                            selectedCategoryIds.insert(category.id)
-                                        }
-                                    }
-                                }
-                            } else if selectedCategories.isEmpty {
-                                Text("暂无\(transactionTypeText)类型的账单类型")
-                                    .foregroundColor(.secondary)
-                                    .font(.caption)
+                                .allowsHitTesting(true)
                             }
                         }
                         .padding(.bottom, 8)
@@ -410,6 +405,14 @@ struct BillFormView: View {
     
     // 根据选中的交易类型和归属人过滤支付方式
     private var filteredPaymentMethods: [PaymentMethodWrapper] {
+        guard let ownerId = selectedOwnerId else {
+            return getFilteredPaymentMethods(for: nil)
+        }
+        return getFilteredPaymentMethods(for: ownerId)
+    }
+    
+    // 根据交易类型和指定归属人过滤支付方式
+    private func getFilteredPaymentMethods(for ownerId: UUID?) -> [PaymentMethodWrapper] {
         var filtered: [PaymentMethodWrapper] = []
         
         switch selectedTransactionType {
@@ -431,8 +434,8 @@ struct BillFormView: View {
             filtered = paymentMethods.filter { $0.transactionType == .expense || $0.transactionType == .income }
         }
         
-        // 如果选择了归属人，进一步过滤支付方式（信贷和储蓄都需要匹配归属人）
-        if let ownerId = selectedOwnerId {
+        // 如果指定了归属人，进一步过滤支付方式（信贷和储蓄都需要匹配归属人）
+        if let ownerId = ownerId {
             filtered = filtered.filter { method in
                 method.ownerId == ownerId
             }
@@ -674,29 +677,30 @@ struct SelectableTagView: View {
     let onTap: () -> Void
     
     var body: some View {
-        Text(text)
-            .font(.footnote)
-            .padding(.horizontal, 10)
-            .padding(.vertical, 6)
-            .background(isSelected ? color : color.opacity(0.2))
-            .foregroundColor(isSelected ? .white : color)
-            .cornerRadius(12)
-            .overlay(
-                RoundedRectangle(cornerRadius: 12)
-                    .stroke(color, lineWidth: isSelected ? 0 : 1)
-            )
-            .overlay(alignment: .trailing) {
-                if isSelected {
-                    Image(systemName: "xmark.circle.fill")
-                        .font(.system(size: 11))
-                        .foregroundColor(.white)
-                        .padding(.trailing, 4)
+        Button(action: {
+            onTap()
+        }) {
+            Text(text)
+                .font(.footnote)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 6)
+                .background(isSelected ? color : color.opacity(0.2))
+                .foregroundColor(isSelected ? .white : color)
+                .cornerRadius(12)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 12)
+                        .stroke(color, lineWidth: isSelected ? 0 : 1)
+                )
+                .overlay(alignment: .trailing) {
+                    if isSelected {
+                        Image(systemName: "xmark.circle.fill")
+                            .font(.system(size: 11))
+                            .foregroundColor(.white)
+                            .padding(.trailing, 4)
+                    }
                 }
-            }
-            .contentShape(Rectangle())
-            .onTapGesture {
-                onTap()
-            }
+        }
+        .buttonStyle(PlainButtonStyle())
     }
 }
 
