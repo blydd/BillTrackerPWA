@@ -26,6 +26,7 @@ struct BillListView: View {
     @State private var selectedCategoryIds: Set<UUID> = []
     @State private var selectedPaymentMethodIds: Set<UUID> = []
     @State private var selectedTransactionTypes: Set<TransactionType> = []  // 交易类型筛选
+    @State private var selectedAccountTypes: Set<AccountType> = []  // 账户类型筛选（信贷/储蓄）
     @State private var startDate: Date?
     @State private var endDate: Date?
     @State private var showingStartDatePicker = false
@@ -104,6 +105,13 @@ struct BillListView: View {
                             ForEach(Array(selectedTransactionTypes), id: \.self) { type in
                                 FilterTagView(text: transactionTypeName(type), color: .indigo) {
                                     selectedTransactionTypes.remove(type)
+                                }
+                            }
+                            
+                            // 账户类型筛选标签
+                            ForEach(Array(selectedAccountTypes), id: \.self) { type in
+                                FilterTagView(text: accountTypeName(type), color: .purple) {
+                                    selectedAccountTypes.remove(type)
                                 }
                             }
                             
@@ -341,6 +349,7 @@ struct BillListView: View {
                 selectedCategoryIds: $selectedCategoryIds,
                 selectedPaymentMethodIds: $selectedPaymentMethodIds,
                 selectedTransactionTypes: $selectedTransactionTypes,
+                selectedAccountTypes: $selectedAccountTypes,
                 startDate: $startDate,
                 endDate: $endDate
             )
@@ -394,6 +403,16 @@ struct BillListView: View {
             bills = bills.filter { selectedPaymentMethodIds.contains($0.paymentMethodId) }
         }
         
+        // 按账户类型筛选（信贷方式/储蓄方式）
+        if !selectedAccountTypes.isEmpty {
+            bills = bills.filter { bill in
+                if let paymentMethod = paymentViewModel.paymentMethods.first(where: { $0.id == bill.paymentMethodId }) {
+                    return selectedAccountTypes.contains(paymentMethod.accountType)
+                }
+                return false
+            }
+        }
+        
         // 按日期范围筛选
         if let start = startDate {
             bills = bills.filter { $0.createdAt >= start }
@@ -440,10 +459,11 @@ struct BillListView: View {
         let categoryKey = selectedCategoryIds.sorted().map { $0.uuidString }.joined(separator: ",")
         let paymentKey = selectedPaymentMethodIds.sorted().map { $0.uuidString }.joined(separator: ",")
         let transactionTypeKey = selectedTransactionTypes.map { $0.rawValue }.sorted().joined(separator: ",")
+        let accountTypeKey = selectedAccountTypes.map { $0.rawValue }.sorted().joined(separator: ",")
         let dateKey = "\(startDate?.timeIntervalSince1970 ?? 0)-\(endDate?.timeIntervalSince1970 ?? 0)"
         // 使用账单数量和最后更新时间作为缓存键的一部分
         let billsKey = "\(billViewModel.bills.count)-\(billViewModel.bills.map { $0.updatedAt.timeIntervalSince1970 }.max() ?? 0)"
-        return "\(ownerKey)|\(categoryKey)|\(paymentKey)|\(transactionTypeKey)|\(dateKey)|\(billsKey)"
+        return "\(ownerKey)|\(categoryKey)|\(paymentKey)|\(transactionTypeKey)|\(accountTypeKey)|\(dateKey)|\(billsKey)"
     }
     
     // 分页显示的账单（确保同一天的账单完整显示）
@@ -519,7 +539,7 @@ struct BillListView: View {
     
     // 是否有激活的筛选条件
     private var hasActiveFilters: Bool {
-        !selectedOwnerIds.isEmpty || !selectedCategoryIds.isEmpty || !selectedPaymentMethodIds.isEmpty || !selectedTransactionTypes.isEmpty || startDate != nil || endDate != nil
+        !selectedOwnerIds.isEmpty || !selectedCategoryIds.isEmpty || !selectedPaymentMethodIds.isEmpty || !selectedTransactionTypes.isEmpty || !selectedAccountTypes.isEmpty || startDate != nil || endDate != nil
     }
     
     // 日期范围文本
@@ -543,6 +563,7 @@ struct BillListView: View {
         selectedCategoryIds.removeAll()
         selectedPaymentMethodIds.removeAll()
         selectedTransactionTypes.removeAll()
+        selectedAccountTypes.removeAll()
         startDate = nil
         endDate = nil
         clearCache()
@@ -557,6 +578,16 @@ struct BillListView: View {
             return "收入"
         case .excluded:
             return "不计入"
+        }
+    }
+    
+    // 账户类型名称
+    private func accountTypeName(_ type: AccountType) -> String {
+        switch type {
+        case .credit:
+            return "信贷方式"
+        case .savings:
+            return "储蓄方式"
         }
     }
     
@@ -1292,6 +1323,7 @@ struct FilterSheetView: View {
     @Binding var selectedCategoryIds: Set<UUID>
     @Binding var selectedPaymentMethodIds: Set<UUID>
     @Binding var selectedTransactionTypes: Set<TransactionType>
+    @Binding var selectedAccountTypes: Set<AccountType>
     @Binding var startDate: Date?
     @Binding var endDate: Date?
     
@@ -1344,6 +1376,32 @@ struct FilterSheetView: View {
                                         selectedTransactionTypes.remove(type)
                                     } else {
                                         selectedTransactionTypes.insert(type)
+                                    }
+                                }
+                            }
+                        }
+                        .padding(.horizontal)
+                    }
+                    
+                    Divider()
+                    
+                    // 账户类型筛选
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text("账户类型")
+                            .font(.headline)
+                            .padding(.horizontal)
+                        
+                        HStack(spacing: 12) {
+                            ForEach([AccountType.credit, AccountType.savings], id: \.self) { type in
+                                SelectableFilterTag(
+                                    text: accountTypeName(type),
+                                    isSelected: selectedAccountTypes.contains(type),
+                                    color: .purple
+                                ) {
+                                    if selectedAccountTypes.contains(type) {
+                                        selectedAccountTypes.remove(type)
+                                    } else {
+                                        selectedAccountTypes.insert(type)
                                     }
                                 }
                             }
@@ -1564,6 +1622,16 @@ struct FilterSheetView: View {
             return "收入"
         case .excluded:
             return "不计入"
+        }
+    }
+    
+    // 账户类型名称
+    private func accountTypeName(_ type: AccountType) -> String {
+        switch type {
+        case .credit:
+            return "信贷方式"
+        case .savings:
+            return "储蓄方式"
         }
     }
     

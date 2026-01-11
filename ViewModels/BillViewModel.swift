@@ -146,7 +146,7 @@ class BillViewModel: ObservableObject {
         
         // 在创建账单前，先更新支付方式余额（如果不是"不计入"类型）
         // Requirements: 6.1, 6.2, 6.3, 6.4, 6.5, 6.6
-        if paymentMethod.transactionType != .excluded {
+        if paymentMethod.transactionType != TransactionType.excluded {
             try await updatePaymentMethodBalance(
                 paymentMethod: paymentMethod,
                 amount: amount,
@@ -171,7 +171,7 @@ class BillViewModel: ObservableObject {
             bills.append(bill)
         } catch {
             // 如果保存失败，需要回滚余额更新
-            if paymentMethod.transactionType != .excluded {
+            if paymentMethod.transactionType != TransactionType.excluded {
                 try? await updatePaymentMethodBalance(
                     paymentMethod: paymentMethod,
                     amount: -amount,
@@ -311,46 +311,116 @@ class BillViewModel: ObservableObject {
         note: String? = nil,
         createdAt: Date
     ) async throws {
-        // 先恢复旧账单的余额影响
-        if let oldPaymentMethod = try await repository.fetchPaymentMethod(by: bill.paymentMethodId),
-           oldPaymentMethod.transactionType != .excluded {
-            try await updatePaymentMethodBalance(
-                paymentMethod: oldPaymentMethod,
-                amount: -bill.amount,
-                isCreating: false,
-                billOwnerId: bill.ownerId
-            )
-        }
+        print("🔄 开始更新账单: ID=\(bill.id)")
+        print("  旧数据: 金额=\(bill.amount), 支付方式=\(bill.paymentMethodId), 归属人=\(bill.ownerId)")
+        print("  新数据: 金额=\(amount), 支付方式=\(paymentMethodId), 归属人=\(ownerId)")
+        
+        // 获取旧支付方式信息
+        let oldPaymentMethod = try await repository.fetchPaymentMethod(by: bill.paymentMethodId)
+        let newPaymentMethod = try await repository.fetchPaymentMethod(by: paymentMethodId)
         
         // 验证新数据
         guard amount != 0 else {
+            print("❌ 更新失败: 金额不能为0")
             throw AppError.invalidAmount
         }
         
-        guard try await repository.fetchPaymentMethod(by: paymentMethodId) != nil else {
+        guard newPaymentMethod != nil else {
+            print("❌ 更新失败: 找不到新支付方式")
             throw AppError.missingPaymentMethod
         }
         
         guard !categoryIds.isEmpty else {
+            print("❌ 更新失败: 必须选择账单类型")
             throw AppError.missingCategory
         }
         
         guard try await repository.fetchOwner(by: ownerId) != nil else {
+            print("❌ 更新失败: 找不到归属人")
             throw AppError.missingOwner
         }
         
-        // 应用新账单的余额影响
-        if let newPaymentMethod = try await repository.fetchPaymentMethod(by: paymentMethodId),
-           newPaymentMethod.transactionType != .excluded {
-            try await updatePaymentMethodBalance(
-                paymentMethod: newPaymentMethod,
-                amount: amount,
-                isCreating: true,
-                billOwnerId: ownerId
-            )
+        // 检查账单类型以确定是否为不计入类型
+        let newCategories = await withTaskGroup(of: BillCategory?.self) { group in
+            var categories: [BillCategory] = []
+            for categoryId in categoryIds {
+                group.addTask {
+                    try? await self.repository.fetchCategory(by: categoryId)
+                }
+            }
+            for await category in group {
+                if let category = category {
+                    categories.append(category)
+                }
+            }
+            return categories
+        }
+        let isNewExcluded = !newCategories.isEmpty && newCategories.allSatisfy { $0.transactionType == TransactionType.excluded }
+        
+        let oldCategories = await withTaskGroup(of: BillCategory?.self) { group in
+            var categories: [BillCategory] = []
+            for categoryId in bill.categoryIds {
+                group.addTask {
+                    try? await self.repository.fetchCategory(by: categoryId)
+                }
+            }
+            for await category in group {
+                if let category = category {
+                    categories.append(category)
+                }
+            }
+            return categories
+        }
+        let isOldExcluded = !oldCategories.isEmpty && oldCategories.allSatisfy { $0.transactionType == TransactionType.excluded }
+        
+        print("  旧账单类型: \(isOldExcluded ? "不计入" : "计入统计")")
+        print("  新账单类型: \(isNewExcluded ? "不计入" : "计入统计")")
+        
+        // 1. 先恢复旧账单的余额影响
+        if let oldMethod = oldPaymentMethod {
+            if isOldExcluded {
+                // 不计入类型需要手动恢复余额
+                print("💰 恢复不计入类型账单的余额影响")
+                try await restoreExcludedBillBalance(
+                    paymentMethod: oldMethod,
+                    amount: bill.amount,
+                    billOwnerId: bill.ownerId
+                )
+            } else if oldMethod.transactionType != TransactionType.excluded {
+                // 普通类型恢复余额
+                print("💰 恢复普通账单的余额影响: -\(bill.amount)")
+                try await updatePaymentMethodBalance(
+                    paymentMethod: oldMethod,
+                    amount: -bill.amount,
+                    isCreating: false,
+                    billOwnerId: bill.ownerId
+                )
+            }
         }
         
-        // 更新账单
+        // 2. 应用新账单的余额影响
+        if let newMethod = newPaymentMethod {
+            if isNewExcluded {
+                // 不计入类型需要手动应用余额
+                print("💰 应用不计入类型账单的余额影响")
+                try await applyExcludedBillBalance(
+                    paymentMethod: newMethod,
+                    amount: amount,
+                    billOwnerId: ownerId
+                )
+            } else if newMethod.transactionType != TransactionType.excluded {
+                // 普通类型应用余额
+                print("💰 应用普通账单的余额影响: \(amount)")
+                try await updatePaymentMethodBalance(
+                    paymentMethod: newMethod,
+                    amount: amount,
+                    isCreating: true,
+                    billOwnerId: ownerId
+                )
+            }
+        }
+        
+        // 3. 更新账单数据
         let updatedBill = Bill(
             id: bill.id,
             amount: amount,
@@ -363,32 +433,123 @@ class BillViewModel: ObservableObject {
         )
         
         do {
+            print("🗄️ 保存账单到数据库...")
             try await repository.updateBill(updatedBill)
+            
+            print("📝 更新内存中的账单列表...")
             if let index = bills.firstIndex(where: { $0.id == bill.id }) {
                 bills[index] = updatedBill
             }
+            
+            print("✅ 账单更新成功")
         } catch {
+            print("❌ 账单保存失败，开始回滚余额...")
+            
             // 回滚余额变化
-            if let oldPaymentMethod = try? await repository.fetchPaymentMethod(by: bill.paymentMethodId),
-               oldPaymentMethod.transactionType != .excluded {
-                try? await updatePaymentMethodBalance(
-                    paymentMethod: oldPaymentMethod,
-                    amount: bill.amount,
-                    isCreating: true,
-                    billOwnerId: bill.ownerId
-                )
+            if let oldMethod = oldPaymentMethod {
+                if isOldExcluded {
+                    try? await applyExcludedBillBalance(
+                        paymentMethod: oldMethod,
+                        amount: bill.amount,
+                        billOwnerId: bill.ownerId
+                    )
+                } else if oldMethod.transactionType != TransactionType.excluded {
+                    try? await updatePaymentMethodBalance(
+                        paymentMethod: oldMethod,
+                        amount: bill.amount,
+                        isCreating: true,
+                        billOwnerId: bill.ownerId
+                    )
+                }
             }
-            if let newPaymentMethod = try? await repository.fetchPaymentMethod(by: paymentMethodId),
-               newPaymentMethod.transactionType != .excluded {
-                try? await updatePaymentMethodBalance(
-                    paymentMethod: newPaymentMethod,
-                    amount: -amount,
-                    isCreating: false,
-                    billOwnerId: ownerId
-                )
+            
+            if let newMethod = newPaymentMethod {
+                if isNewExcluded {
+                    try? await restoreExcludedBillBalance(
+                        paymentMethod: newMethod,
+                        amount: amount,
+                        billOwnerId: ownerId
+                    )
+                } else if newMethod.transactionType != TransactionType.excluded {
+                    try? await updatePaymentMethodBalance(
+                        paymentMethod: newMethod,
+                        amount: -amount,
+                        isCreating: false,
+                        billOwnerId: ownerId
+                    )
+                }
             }
+            
+            print("🔄 余额回滚完成")
             throw AppError.persistenceError(underlying: error)
         }
+    }
+    
+    // MARK: - 不计入类型账单的余额处理
+    
+    /// 恢复不计入类型账单的余额影响
+    private func restoreExcludedBillBalance(
+        paymentMethod: PaymentMethodWrapper,
+        amount: Decimal,
+        billOwnerId: UUID
+    ) async throws {
+        var updatedMethod = paymentMethod
+        
+        switch paymentMethod {
+        case .credit(var creditMethod):
+            guard creditMethod.ownerId == billOwnerId else {
+                throw AppError.ownerMismatch
+            }
+            // 恢复余额：删除账单时，需要反向操作
+            creditMethod.outstandingBalance += amount
+            updatedMethod = .credit(creditMethod)
+            
+        case .savings(var savingsMethod):
+            guard savingsMethod.ownerId == billOwnerId else {
+                throw AppError.ownerMismatch
+            }
+            // 恢复余额：删除账单时，需要反向操作
+            savingsMethod.balance -= amount
+            updatedMethod = .savings(savingsMethod)
+        }
+        
+        try await repository.updatePaymentMethod(updatedMethod)
+    }
+    
+    /// 应用不计入类型账单的余额影响
+    private func applyExcludedBillBalance(
+        paymentMethod: PaymentMethodWrapper,
+        amount: Decimal,
+        billOwnerId: UUID
+    ) async throws {
+        var updatedMethod = paymentMethod
+        
+        switch paymentMethod {
+        case .credit(var creditMethod):
+            guard creditMethod.ownerId == billOwnerId else {
+                throw AppError.ownerMismatch
+            }
+            
+            let newBalance = creditMethod.outstandingBalance - amount
+            
+            // 检查是否超过信用额度（只在消费时检查）
+            if newBalance > creditMethod.creditLimit {
+                throw AppError.creditLimitExceeded
+            }
+            
+            creditMethod.outstandingBalance = newBalance
+            updatedMethod = .credit(creditMethod)
+            
+        case .savings(var savingsMethod):
+            guard savingsMethod.ownerId == billOwnerId else {
+                throw AppError.ownerMismatch
+            }
+            
+            savingsMethod.balance += amount
+            updatedMethod = .savings(savingsMethod)
+        }
+        
+        try await repository.updatePaymentMethod(updatedMethod)
     }
     
     // MARK: - Bill Deletion
@@ -409,7 +570,7 @@ class BillViewModel: ObservableObject {
         print("💳 支付方式: \(paymentMethod.name), 类型: \(paymentMethod.transactionType)")
         
         // 恢复支付方式余额（如果不是"不计入"类型）
-        if paymentMethod.transactionType != .excluded {
+        if paymentMethod.transactionType != TransactionType.excluded {
             print("💰 恢复余额: -\(bill.amount)")
             try await updatePaymentMethodBalance(
                 paymentMethod: paymentMethod,
@@ -463,7 +624,7 @@ class BillViewModel: ObservableObject {
         } catch {
             print("❌ 删除失败: \(error)")
             // 如果删除失败，回滚余额
-            if paymentMethod.transactionType != .excluded {
+            if paymentMethod.transactionType != TransactionType.excluded {
                 print("🔄 回滚余额...")
                 try? await updatePaymentMethodBalance(
                     paymentMethod: paymentMethod,

@@ -43,7 +43,7 @@ struct InitializationView: View {
                             Text("支出:")
                                 .font(.caption)
                                 .foregroundColor(.secondary)
-                            Text("衣、食、住、行、教育、医疗、娱乐、保险、购物、燃气、水费、话费、电费、人情、其他")
+                            Text("衣、食、外卖、下馆子、超市、赶集、转给妈、住、电费、水费、燃气、房租、行、加油、停车费、轿车、摩托、购物、京东、拼多多、淘宝、米乐、教育、医疗、娱乐、电影、保险、话费、人情、老家装修、其他")
                                 .font(.caption)
                         }
                         
@@ -51,7 +51,7 @@ struct InitializationView: View {
                             Text("收入:")
                                 .font(.caption)
                                 .foregroundColor(.secondary)
-                            Text("工资、其他")
+                            Text("工资、保险理赔、其他")
                                 .font(.caption)
                         }
                         
@@ -59,7 +59,7 @@ struct InitializationView: View {
                             Text("不计入:")
                                 .font(.caption)
                                 .foregroundColor(.secondary)
-                            Text("还信用卡")
+                            Text("还信用卡、对冲")
                                 .font(.caption)
                         }
                     }

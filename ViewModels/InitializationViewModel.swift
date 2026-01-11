@@ -99,10 +99,11 @@ class InitializationViewModel: ObservableObject {
     
     /// 初始化账单类型
     private func initializeCategories() async throws {
-        // 支出类型
+        // 支出类型（31个）
         let expenseCategories = [
-            "衣", "食", "住", "行", "教育", "医疗", "娱乐", "保险",
-            "购物", "燃气", "水费", "话费", "电费", "人情", "其他"
+            "衣", "食", "外卖", "下馆子", "超市", "赶集", "转给妈", "住", "电费", "水费",
+            "燃气", "房租", "行", "加油", "停车费", "轿车", "摩托", "购物", "京东", "拼多多",
+            "淘宝", "米乐", "教育", "医疗", "娱乐", "电影", "保险", "话费", "人情", "老家装修", "其他"
         ]
         
         for (index, name) in expenseCategories.enumerated() {
@@ -111,16 +112,16 @@ class InitializationViewModel: ObservableObject {
             try await repository.saveCategory(category)
         }
         
-        // 收入类型
-        let incomeCategories = ["工资", "其他"]
+        // 收入类型（3个）
+        let incomeCategories = ["工资", "保险理赔", "其他"]
         
         for (index, name) in incomeCategories.enumerated() {
             let category = BillCategory(name: name, transactionType: .income, sortOrder: index)
             try await repository.saveCategory(category)
         }
         
-        // 不计入类型
-        let excludedCategories = ["还信用卡"]
+        // 不计入类型（2个）
+        let excludedCategories = ["还信用卡", "对冲"]
         
         for (index, name) in excludedCategories.enumerated() {
             let category = BillCategory(name: name, transactionType: .excluded, sortOrder: index)
