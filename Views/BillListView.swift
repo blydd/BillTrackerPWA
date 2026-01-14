@@ -845,6 +845,18 @@ struct DailySummaryHeader: View {
                     .font(.system(size: 11, weight: .medium))
                     .foregroundColor(.red)
             }
+            
+            // 如果有不计入类型的账单，显示不计入总额
+            if dailyExcluded != 0 {
+                HStack(spacing: 3) {
+                    Image(systemName: "minus.circle.fill")
+                        .font(.system(size: 10))
+                        .foregroundColor(.gray)
+                    Text("¥\(abs(dailyExcluded) as NSDecimalNumber, formatter: numberFormatter)")
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundColor(.gray)
+                }
+            }
         }
         .padding(.vertical, 2)
         .textCase(nil)
@@ -858,7 +870,7 @@ struct DailySummaryHeader: View {
             }
             
             // 如果账单的所有类型都是不计入，则排除
-            let isExcluded = !billCategories.isEmpty && billCategories.allSatisfy { $0.transactionType == .excluded }
+            let isExcluded = !billCategories.isEmpty && billCategories.allSatisfy { $0.transactionType == TransactionType.excluded }
             
             if isExcluded {
                 return total
@@ -880,7 +892,7 @@ struct DailySummaryHeader: View {
             }
             
             // 如果账单的所有类型都是不计入，则排除
-            let isExcluded = !billCategories.isEmpty && billCategories.allSatisfy { $0.transactionType == .excluded }
+            let isExcluded = !billCategories.isEmpty && billCategories.allSatisfy { $0.transactionType == TransactionType.excluded }
             
             if isExcluded {
                 return total
@@ -889,6 +901,24 @@ struct DailySummaryHeader: View {
             // 金额为负数表示支出，取绝对值
             if bill.amount < 0 {
                 return total + abs(bill.amount)
+            }
+            return total
+        }
+    }
+    
+    // 不计入类型的总额
+    private var dailyExcluded: Decimal {
+        bills.reduce(0) { total, bill in
+            // 检查账单是否为不计入类型
+            let billCategories = bill.categoryIds.compactMap { id in
+                categories.first(where: { $0.id == id })
+            }
+            
+            // 只统计不计入类型的账单
+            let isExcluded = !billCategories.isEmpty && billCategories.allSatisfy { $0.transactionType == TransactionType.excluded }
+            
+            if isExcluded {
+                return total + bill.amount
             }
             return total
         }
