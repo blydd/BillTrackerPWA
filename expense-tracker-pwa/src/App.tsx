@@ -1,13 +1,23 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Home, BarChart3, Settings } from 'lucide-react';
 import BillListView from './components/BillListView';
 import StatisticsView from './components/StatisticsView';
 import SettingsView from './components/SettingsView';
+import { startAutoBackupCheck, stopAutoBackupCheck } from './services/fileSystemBackupService';
 
 type Tab = 'bills' | 'statistics' | 'settings';
 
 function App() {
   const [activeTab, setActiveTab] = useState<Tab>('bills');
+
+  // 启动自动备份检查
+  useEffect(() => {
+    startAutoBackupCheck();
+    
+    return () => {
+      stopAutoBackupCheck();
+    };
+  }, []);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 flex flex-col">

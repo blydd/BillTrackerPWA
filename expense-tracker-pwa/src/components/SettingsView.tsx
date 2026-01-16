@@ -1,7 +1,20 @@
-import { useState } from 'react';
-import { Upload, Database, Trash2, ChevronRight, Tag, Users, CreditCard } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Upload, Database, Trash2, ChevronRight, Tag, Users, CreditCard, FolderOpen, Save, RotateCcw } from 'lucide-react';
 import { initializeData, clearAllData } from '../services/db';
 import { importFromCSV } from '../services/exportService';
+import {
+  isFileSystemAccessSupported,
+  requestBackupDirectory,
+  performBackup,
+  restoreFromBackup,
+  getSavedDirectoryHandle,
+  clearBackupDirectory,
+  getLastBackupTime,
+  AUTO_BACKUP_INTERVALS,
+  getAutoBackupInterval,
+  setAutoBackupInterval,
+  type AutoBackupInterval
+} from '../services/fileSystemBackupService';
 import CategoryManagementView from './CategoryManagementView';
 import OwnerManagementView from './OwnerManagementView';
 import PaymentMethodManagementView from './PaymentMethodManagementView';
@@ -11,6 +24,89 @@ type ManagementView = 'main' | 'category' | 'owner' | 'payment';
 export default function SettingsView() {
   const [importing, setImporting] = useState(false);
   const [currentView, setCurrentView] = useState<ManagementView>('main');
+  const [backupConfigured, setBackupConfigured] = useState(false);
+  const [lastBackup, setLastBackup] = useState<Date | null>(null);
+  const [backing, setBacking] = useState(false);
+  const [autoBackupInterval, setAutoBackupIntervalState] = useState<AutoBackupInterval>(AUTO_BACKUP_INTERVALS.WEEKLY);
+
+  useEffect(() => {
+    checkBackupStatus();
+    loadAutoBackupInterval();
+  }, []);
+
+  async function loadAutoBackupInterval() {
+    const interval = await getAutoBackupInterval();
+    setAutoBackupIntervalState(interval);
+  }
+
+  async function handleAutoBackupIntervalChange(interval: AutoBackupInterval) {
+    try {
+      await setAutoBackupInterval(interval);
+      setAutoBackupIntervalState(interval);
+    } catch (error) {
+      alert('设置失败：' + (error as Error).message);
+    }
+  }
+
+  async function checkBackupStatus() {
+    const dirHandle = await getSavedDirectoryHandle();
+    setBackupConfigured(!!dirHandle);
+    const lastTime = await getLastBackupTime();
+    setLastBackup(lastTime);
+  }
+
+  const handleConfigureBackup = async () => {
+    try {
+      const dirHandle = await requestBackupDirectory();
+      if (dirHandle) {
+        alert('备份文件夹设置成功！');
+        await checkBackupStatus();
+      }
+    } catch (error) {
+      alert('设置失败：' + (error as Error).message);
+    }
+  };
+
+  const handleBackupNow = async () => {
+    setBacking(true);
+    try {
+      const fileName = await performBackup();
+      alert(`备份成功！\n文件名：${fileName}`);
+      await checkBackupStatus();
+    } catch (error) {
+      alert('备份失败：' + (error as Error).message);
+    } finally {
+      setBacking(false);
+    }
+  };
+
+  const handleRestore = async () => {
+    if (!confirm('确定要从备份恢复数据吗？这将覆盖当前所有数据！')) {
+      return;
+    }
+
+    try {
+      await restoreFromBackup();
+      alert('恢复成功！');
+      window.location.reload();
+    } catch (error) {
+      alert('恢复失败：' + (error as Error).message);
+    }
+  };
+
+  const handleClearBackupConfig = async () => {
+    if (!confirm('确定要清除备份配置吗？')) {
+      return;
+    }
+
+    try {
+      await clearBackupDirectory();
+      setBackupConfigured(false);
+      alert('备份配置已清除');
+    } catch (error) {
+      alert('清除失败：' + (error as Error).message);
+    }
+  };
 
   const handleInitialize = async () => {
     if (!confirm('确定要初始化数据吗？这将创建默认的归属人、账单类型和支付方式。')) {
@@ -178,6 +274,120 @@ export default function SettingsView() {
           <ChevronRight size={20} className="text-gray-400" />
         </button>
       </div>
+
+      {/* 自动备份 */}
+      {isFileSystemAccessSupported() && (
+        <div className="bg-white rounded-2xl shadow-lg overflow-hidden">
+          <div className="px-4 py-3 bg-gradient-to-r from-orange-600 to-orange-700">
+            <h3 className="font-semibold text-white">自动备份</h3>
+          </div>
+
+          {/* 配置备份文件夹 */}
+          <div className="p-4 border-b">
+            <div className="flex items-center justify-between gap-4">
+              <div className="flex-1">
+                <div className="font-semibold text-gray-800">备份文件夹</div>
+                <div className="text-sm text-gray-500 mt-1">
+                  {backupConfigured ? (
+                    <>
+                      <span className="text-green-600">✓ 已配置</span>
+                      {lastBackup && (
+                        <span className="ml-2">
+                          最后备份：{lastBackup.toLocaleString('zh-CN')}
+                        </span>
+                      )}
+                    </>
+                  ) : (
+                    '选择本地文件夹用于自动备份'
+                  )}
+                </div>
+              </div>
+              <div className="flex gap-2">
+                {backupConfigured && (
+                  <button
+                    onClick={handleClearBackupConfig}
+                    className="px-3 py-2 bg-gray-200 text-gray-700 rounded-xl hover:bg-gray-300 transition-all whitespace-nowrap text-sm"
+                  >
+                    清除
+                  </button>
+                )}
+                <button
+                  onClick={handleConfigureBackup}
+                  className="px-4 py-2 bg-gradient-to-r from-orange-600 to-orange-700 text-white rounded-xl hover:from-orange-700 hover:to-orange-800 shadow-md transition-all whitespace-nowrap"
+                >
+                  <FolderOpen size={18} className="inline mr-2" />
+                  {backupConfigured ? '重新选择' : '选择文件夹'}
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* 自动备份间隔 */}
+          {backupConfigured && (
+            <div className="p-4 border-b">
+              <div className="flex items-center justify-between gap-4">
+                <div className="flex-1">
+                  <div className="font-semibold text-gray-800">自动备份间隔</div>
+                  <div className="text-sm text-gray-500 mt-1">
+                    应用运行时会自动检查并备份
+                  </div>
+                </div>
+                <select
+                  value={autoBackupInterval}
+                  onChange={(e) => handleAutoBackupIntervalChange(Number(e.target.value) as AutoBackupInterval)}
+                  className="px-4 py-2 border-2 border-gray-300 rounded-xl focus:border-orange-500 focus:ring-2 focus:ring-orange-200 transition-all"
+                >
+                  <option value={AUTO_BACKUP_INTERVALS.DAILY}>每天</option>
+                  <option value={AUTO_BACKUP_INTERVALS.THREE_DAYS}>每3天</option>
+                  <option value={AUTO_BACKUP_INTERVALS.WEEKLY}>每周</option>
+                  <option value={AUTO_BACKUP_INTERVALS.DISABLED}>禁用</option>
+                </select>
+              </div>
+            </div>
+          )}
+
+          {/* 立即备份 */}
+          {backupConfigured && (
+            <div className="p-4 border-b">
+              <div className="flex items-center justify-between gap-4">
+                <div className="flex-1">
+                  <div className="font-semibold text-gray-800">立即备份</div>
+                  <div className="text-sm text-gray-500 mt-1">
+                    手动执行一次备份
+                  </div>
+                </div>
+                <button
+                  onClick={handleBackupNow}
+                  disabled={backing}
+                  className="px-4 py-2 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-xl hover:from-blue-700 hover:to-blue-800 shadow-md transition-all whitespace-nowrap disabled:opacity-50"
+                >
+                  <Save size={18} className="inline mr-2" />
+                  {backing ? '备份中...' : '立即备份'}
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* 从备份恢复 */}
+          <div className="p-4">
+            <div className="flex items-center justify-between gap-4">
+              <div className="flex-1">
+                <div className="font-semibold text-gray-800">从备份恢复</div>
+                <div className="text-sm text-gray-500 mt-1">
+                  选择备份文件恢复数据
+                </div>
+              </div>
+              <button
+                onClick={handleRestore}
+                className="px-4 py-2 bg-gradient-to-r from-purple-600 to-purple-700 text-white rounded-xl hover:from-purple-700 hover:to-purple-800 shadow-md transition-all whitespace-nowrap"
+              >
+                <RotateCcw size={18} className="inline mr-2" />
+                恢复数据
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* 系统操作 */}
       <div className="bg-white rounded-2xl shadow-lg overflow-hidden">
