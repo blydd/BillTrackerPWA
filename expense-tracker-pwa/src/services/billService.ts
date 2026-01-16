@@ -11,15 +11,17 @@ export async function createBill(bill: Omit<Bill, 'id' | 'createdAt' | 'updatedA
   };
 
   // 开始事务
-  return await db.transaction('rw', db.bills, db.paymentMethods, async () => {
+  const result = await db.transaction('rw', db.bills, db.paymentMethods, async () => {
     // 创建账单
-    const billId = await db.bills.add(newBill) as number;
+    const billId = await db.bills.add(newBill);
 
     // 更新支付方式余额
     await updatePaymentMethodBalance(bill.paymentMethodId, bill.amount, bill.transactionType);
 
     return billId;
   });
+  
+  return result as number;
 }
 
 // 更新账单
