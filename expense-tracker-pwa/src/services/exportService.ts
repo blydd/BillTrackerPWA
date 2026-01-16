@@ -1,5 +1,5 @@
 import { db } from './db';
-import { Bill, TransactionType } from '../models/types';
+import { Bill, TransactionType, AccountType } from '../models/types';
 import { format } from 'date-fns';
 
 // 导出为 CSV
@@ -153,13 +153,11 @@ export async function importFromCSV(file: File): Promise<{ success: number; fail
         for (const name of newCategories) {
           const id = await db.categories.add({
             name,
-            color: '#6366f1', // 默认靛蓝色
-            icon: '📝',
+            transactionType: TransactionType.EXPENSE, // 默认为支出类型
             sortOrder: categories.length + categoryNameMap.size,
-            createdAt: now,
-            updatedAt: now
+            createdAt: now
           });
-          categoryNameMap.set(name, id);
+          categoryNameMap.set(name, id as number);
         }
 
         // 创建归属人
@@ -167,23 +165,22 @@ export async function importFromCSV(file: File): Promise<{ success: number; fail
           const id = await db.owners.add({
             name,
             sortOrder: owners.length + ownerNameMap.size,
-            createdAt: now,
-            updatedAt: now
+            createdAt: now
           });
-          ownerNameMap.set(name, id);
+          ownerNameMap.set(name, id as number);
         }
 
         // 创建支付方式（默认为储蓄方式，余额为0）
         for (const name of newPaymentMethods) {
           const id = await db.paymentMethods.add({
             name,
-            accountType: 'savings', // 默认储蓄方式
+            accountType: AccountType.SAVINGS, // 默认储蓄方式
+            ownerId: 0, // 需要手动关联归属人
             balance: 0, // 初始余额为0
             sortOrder: paymentMethods.length + paymentMethodNameMap.size,
-            createdAt: now,
-            updatedAt: now
+            createdAt: now
           });
-          paymentMethodNameMap.set(name, id);
+          paymentMethodNameMap.set(name, id as number);
         }
 
         // 第二遍：导入账单数据

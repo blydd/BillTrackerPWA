@@ -1,5 +1,5 @@
 import Dexie, { Table } from 'dexie';
-import { Bill, BillCategory, Owner, PaymentMethod } from '../models/types';
+import { Bill, BillCategory, Owner, PaymentMethod, TransactionType, AccountType } from '../models/types';
 
 // 数据库类
 export class ExpenseTrackerDB extends Dexie {
@@ -45,7 +45,7 @@ export async function initializeData() {
     '淘宝', '米乐', '教育', '医疗', '娱乐', '电影', '保险', '话费', '人情', '老家装修', '其他'
   ].map((name, index) => ({
     name,
-    transactionType: 'expense' as const,
+    transactionType: TransactionType.EXPENSE,
     sortOrder: index,
     createdAt: new Date()
   }));
@@ -55,7 +55,7 @@ export async function initializeData() {
     '工资', '保险理赔', '其他'
   ].map((name, index) => ({
     name,
-    transactionType: 'income' as const,
+    transactionType: TransactionType.INCOME,
     sortOrder: index,
     createdAt: new Date()
   }));
@@ -65,7 +65,7 @@ export async function initializeData() {
     '还信用卡', '对冲'
   ].map((name, index) => ({
     name,
-    transactionType: 'excluded' as const,
+    transactionType: TransactionType.EXCLUDED,
     sortOrder: index,
     createdAt: new Date()
   }));
@@ -76,7 +76,7 @@ export async function initializeData() {
   const maleOwnerId = ownerIds[0] as number;
   const femaleOwnerId = ownerIds[1] as number;
   
-  const paymentMethods = [];
+  const paymentMethods: Omit<PaymentMethod, 'id'>[] = [];
   
   // 男主的信贷方式
   const maleCreditMethods = [
@@ -99,7 +99,7 @@ export async function initializeData() {
   maleCreditMethods.forEach((method, index) => {
     paymentMethods.push({
       name: method.name,
-      accountType: 'credit' as const,
+      accountType: AccountType.CREDIT,
       ownerId: maleOwnerId,
       balance: 0,
       creditLimit: method.limit,
@@ -126,7 +126,7 @@ export async function initializeData() {
   femaleCreditMethods.forEach((method, index) => {
     paymentMethods.push({
       name: method.name,
-      accountType: 'credit' as const,
+      accountType: AccountType.CREDIT,
       ownerId: femaleOwnerId,
       balance: 0,
       creditLimit: method.limit,
@@ -139,11 +139,11 @@ export async function initializeData() {
   // 男主和女主的储蓄方式
   const savingsMethods = ['微信零钱', '余额宝'];
   
-  [maleOwnerId, femaleOwnerId].forEach((ownerId, ownerIndex) => {
+  [maleOwnerId, femaleOwnerId].forEach((ownerId) => {
     savingsMethods.forEach((name, index) => {
       paymentMethods.push({
         name,
-        accountType: 'savings' as const,
+        accountType: AccountType.SAVINGS,
         ownerId,
         balance: 0,
         sortOrder: index,
