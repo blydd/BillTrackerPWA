@@ -13,7 +13,7 @@ export async function createBill(bill: Omit<Bill, 'id' | 'createdAt' | 'updatedA
   // 开始事务
   return await db.transaction('rw', db.bills, db.paymentMethods, async () => {
     // 创建账单
-    const billId = await db.bills.add(newBill);
+    const billId = await db.bills.add(newBill) as number;
 
     // 更新支付方式余额
     await updatePaymentMethodBalance(bill.paymentMethodId, bill.amount, bill.transactionType);
