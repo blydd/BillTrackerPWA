@@ -7,7 +7,7 @@ import {
   uploadBackupToGoogleDrive,
   downloadBackupFromGoogleDrive,
   listBackupFiles,
-  isGoogleDriveConfigured
+  isGoogleDriveAvailable
 } from './googleDriveService';
 
 // Google Drive 备份相关接口（预留）
@@ -49,11 +49,6 @@ export interface BackupConfig {
   method: BackupMethod;
   interval: BackupInterval;
   lastBackupTime?: Date;
-  googleDriveConfig?: {
-    apiKey: string;
-    clientId: string;
-    enabled: boolean;
-  };
 }
 
 // 生成备份数据
@@ -170,18 +165,12 @@ export async function restoreFromBackupFile(): Promise<void> {
 // Google Drive 备份
 export async function uploadToGoogleDrive(): Promise<string> {
   try {
-    const config = await getBackupConfig();
-    
-    if (!config.googleDriveConfig?.enabled) {
-      throw new Error('Google Drive 备份未启用');
-    }
-
-    if (!isGoogleDriveConfigured(config.googleDriveConfig.apiKey, config.googleDriveConfig.clientId)) {
-      throw new Error('Google Drive API 配置不完整');
+    if (!isGoogleDriveAvailable()) {
+      throw new Error('Google Drive 功能暂不可用');
     }
 
     // 初始化 Google Drive API
-    await initializeGoogleDrive(config.googleDriveConfig.apiKey, config.googleDriveConfig.clientId);
+    await initializeGoogleDrive();
 
     // 检查登录状态
     if (!isGoogleDriveSignedIn()) {
@@ -209,18 +198,12 @@ export async function uploadToGoogleDrive(): Promise<string> {
 // 从 Google Drive 恢复备份
 export async function restoreFromGoogleDrive(): Promise<void> {
   try {
-    const config = await getBackupConfig();
-    
-    if (!config.googleDriveConfig?.enabled) {
-      throw new Error('Google Drive 备份未启用');
-    }
-
-    if (!isGoogleDriveConfigured(config.googleDriveConfig.apiKey, config.googleDriveConfig.clientId)) {
-      throw new Error('Google Drive API 配置不完整');
+    if (!isGoogleDriveAvailable()) {
+      throw new Error('Google Drive 功能暂不可用');
     }
 
     // 初始化 Google Drive API
-    await initializeGoogleDrive(config.googleDriveConfig.apiKey, config.googleDriveConfig.clientId);
+    await initializeGoogleDrive();
 
     // 检查登录状态
     if (!isGoogleDriveSignedIn()) {
@@ -274,20 +257,14 @@ export async function restoreFromGoogleDrive(): Promise<void> {
 }
 
 // 获取 Google Drive 备份文件列表
-export async function getGoogleDriveBackupList(): Promise<gapi.client.drive.File[]> {
+export async function getGoogleDriveBackupList(): Promise<any[]> {
   try {
-    const config = await getBackupConfig();
-    
-    if (!config.googleDriveConfig?.enabled) {
-      throw new Error('Google Drive 备份未启用');
-    }
-
-    if (!isGoogleDriveConfigured(config.googleDriveConfig.apiKey, config.googleDriveConfig.clientId)) {
-      throw new Error('Google Drive API 配置不完整');
+    if (!isGoogleDriveAvailable()) {
+      throw new Error('Google Drive 功能暂不可用');
     }
 
     // 初始化 Google Drive API
-    await initializeGoogleDrive(config.googleDriveConfig.apiKey, config.googleDriveConfig.clientId);
+    await initializeGoogleDrive();
 
     // 检查登录状态
     if (!isGoogleDriveSignedIn()) {
