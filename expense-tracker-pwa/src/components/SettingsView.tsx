@@ -1,20 +1,17 @@
 import { useState, useEffect } from 'react';
-import { Upload, Database, Trash2, ChevronRight, Tag, Users, CreditCard, FolderOpen, Save, RotateCcw } from 'lucide-react';
+import { Upload, Database, Trash2, ChevronRight, Tag, Users, CreditCard, Download, Save, RotateCcw, Cloud } from 'lucide-react';
 import { initializeData, clearAllData } from '../services/db';
 import { importFromCSV } from '../services/exportService';
 import {
-  isFileSystemAccessSupported,
-  requestBackupDirectory,
-  performBackup,
-  restoreFromBackup,
-  getSavedDirectoryHandle,
-  clearBackupDirectory,
-  getLastBackupTime,
-  AUTO_BACKUP_INTERVALS,
-  getAutoBackupInterval,
-  setAutoBackupInterval,
-  type AutoBackupInterval
-} from '../services/fileSystemBackupService';
+  BackupMethod,
+  BACKUP_INTERVALS,
+  type BackupInterval,
+  type BackupConfig,
+  getBackupConfig,
+  saveBackupConfig,
+  downloadBackup,
+  restoreFromBackupFile
+} from '../services/universalBackupService';
 import CategoryManagementView from './CategoryManagementView';
 import OwnerManagementView from './OwnerManagementView';
 import PaymentMethodManagementView from './PaymentMethodManagementView';
@@ -24,55 +21,56 @@ type ManagementView = 'main' | 'category' | 'owner' | 'payment';
 export default function SettingsView() {
   const [importing, setImporting] = useState(false);
   const [currentView, setCurrentView] = useState<ManagementView>('main');
-  const [backupConfigured, setBackupConfigured] = useState(false);
-  const [lastBackup, setLastBackup] = useState<Date | null>(null);
+  const [backupConfig, setBackupConfig] = useState<BackupConfig>({
+    method: BackupMethod.LOCAL_DOWNLOAD,
+    interval: BACKUP_INTERVALS.WEEKLY
+  });
   const [backing, setBacking] = useState(false);
-  const [autoBackupInterval, setAutoBackupIntervalState] = useState<AutoBackupInterval>(AUTO_BACKUP_INTERVALS.WEEKLY);
 
   useEffect(() => {
-    checkBackupStatus();
-    loadAutoBackupInterval();
+    loadBackupConfig();
   }, []);
 
-  async function loadAutoBackupInterval() {
-    const interval = await getAutoBackupInterval();
-    setAutoBackupIntervalState(interval);
+  async function loadBackupConfig() {
+    try {
+      const config = await getBackupConfig();
+      setBackupConfig(config);
+    } catch (error) {
+      console.error('加载备份配置失败:', error);
+    }
   }
 
-  async function handleAutoBackupIntervalChange(interval: AutoBackupInterval) {
+  async function handleBackupMethodChange(method: BackupMethod) {
     try {
-      await setAutoBackupInterval(interval);
-      setAutoBackupIntervalState(interval);
+      const newConfig = { ...backupConfig, method };
+      await saveBackupConfig(newConfig);
+      setBackupConfig(newConfig);
     } catch (error) {
       alert('设置失败：' + (error as Error).message);
     }
   }
 
-  async function checkBackupStatus() {
-    const dirHandle = await getSavedDirectoryHandle();
-    setBackupConfigured(!!dirHandle);
-    const lastTime = await getLastBackupTime();
-    setLastBackup(lastTime);
-  }
-
-  const handleConfigureBackup = async () => {
+  async function handleBackupIntervalChange(interval: BackupInterval) {
     try {
-      const dirHandle = await requestBackupDirectory();
-      if (dirHandle) {
-        alert('备份文件夹设置成功！');
-        await checkBackupStatus();
-      }
+      const newConfig = { ...backupConfig, interval };
+      await saveBackupConfig(newConfig);
+      setBackupConfig(newConfig);
     } catch (error) {
       alert('设置失败：' + (error as Error).message);
     }
-  };
+  }
 
   const handleBackupNow = async () => {
     setBacking(true);
     try {
-      const fileName = await performBackup();
-      alert(`备份成功！\n文件名：${fileName}`);
-      await checkBackupStatus();
+      if (backupConfig.method === BackupMethod.LOCAL_DOWNLOAD) {
+        await downloadBackup();
+        alert('备份成功！文件已下载到您的下载文件夹');
+      } else if (backupConfig.method === BackupMethod.GOOGLE_DRIVE) {
+        alert('Google Drive 备份功能开发中，请使用本地下载备份');
+      } else {
+        alert('请先选择备份方式');
+      }
     } catch (error) {
       alert('备份失败：' + (error as Error).message);
     } finally {
@@ -86,25 +84,11 @@ export default function SettingsView() {
     }
 
     try {
-      await restoreFromBackup();
+      await restoreFromBackupFile();
       alert('恢复成功！');
       window.location.reload();
     } catch (error) {
       alert('恢复失败：' + (error as Error).message);
-    }
-  };
-
-  const handleClearBackupConfig = async () => {
-    if (!confirm('确定要清除备份配置吗？')) {
-      return;
-    }
-
-    try {
-      await clearBackupDirectory();
-      setBackupConfigured(false);
-      alert('备份配置已清除');
-    } catch (error) {
-      alert('清除失败：' + (error as Error).message);
     }
   };
 
@@ -275,137 +259,149 @@ export default function SettingsView() {
         </button>
       </div>
 
-      {/* 自动备份 */}
-      {isFileSystemAccessSupported() ? (
-        <div className="bg-white rounded-2xl shadow-lg overflow-hidden">
-          <div className="px-4 py-3 bg-gradient-to-r from-orange-600 to-orange-700">
-            <h3 className="font-semibold text-white">自动备份</h3>
-          </div>
+      {/* 数据备份 */}
+      <div className="bg-white rounded-2xl shadow-lg overflow-hidden">
+        <div className="px-4 py-3 bg-gradient-to-r from-orange-600 to-orange-700">
+          <h3 className="font-semibold text-white">数据备份</h3>
+        </div>
 
-          {/* 配置备份文件夹 */}
+        {/* 备份方式选择 */}
+        <div className="p-4 border-b">
+          <div className="mb-3">
+            <div className="font-semibold text-gray-800 mb-2">备份方式</div>
+            <div className="text-sm text-gray-500 mb-3">
+              选择您偏好的备份方式
+            </div>
+          </div>
+          <div className="space-y-2">
+            <label className="flex items-center gap-3 p-3 border-2 rounded-xl cursor-pointer hover:bg-gray-50 transition-all">
+              <input
+                type="radio"
+                name="backupMethod"
+                value={BackupMethod.LOCAL_DOWNLOAD}
+                checked={backupConfig.method === BackupMethod.LOCAL_DOWNLOAD}
+                onChange={(e) => handleBackupMethodChange(e.target.value as BackupMethod)}
+                className="text-orange-600"
+              />
+              <Download size={20} className="text-blue-600" />
+              <div className="flex-1">
+                <div className="font-medium text-gray-800">本地下载</div>
+                <div className="text-sm text-gray-500">备份文件下载到本地（推荐，兼容所有浏览器）</div>
+              </div>
+            </label>
+            <label className="flex items-center gap-3 p-3 border-2 rounded-xl cursor-pointer hover:bg-gray-50 transition-all opacity-60">
+              <input
+                type="radio"
+                name="backupMethod"
+                value={BackupMethod.GOOGLE_DRIVE}
+                checked={backupConfig.method === BackupMethod.GOOGLE_DRIVE}
+                onChange={(e) => handleBackupMethodChange(e.target.value as BackupMethod)}
+                className="text-orange-600"
+                disabled
+              />
+              <Cloud size={20} className="text-green-600" />
+              <div className="flex-1">
+                <div className="font-medium text-gray-800">Google Drive</div>
+                <div className="text-sm text-gray-500">自动上传到 Google Drive（开发中）</div>
+              </div>
+            </label>
+            <label className="flex items-center gap-3 p-3 border-2 rounded-xl cursor-pointer hover:bg-gray-50 transition-all">
+              <input
+                type="radio"
+                name="backupMethod"
+                value={BackupMethod.DISABLED}
+                checked={backupConfig.method === BackupMethod.DISABLED}
+                onChange={(e) => handleBackupMethodChange(e.target.value as BackupMethod)}
+                className="text-orange-600"
+              />
+              <div className="w-5 h-5 flex items-center justify-center">
+                <span className="text-gray-400">✕</span>
+              </div>
+              <div className="flex-1">
+                <div className="font-medium text-gray-800">禁用备份</div>
+                <div className="text-sm text-gray-500">不进行自动备份</div>
+              </div>
+            </label>
+          </div>
+        </div>
+
+        {/* 自动备份间隔 */}
+        {backupConfig.method !== BackupMethod.DISABLED && (
           <div className="p-4 border-b">
             <div className="flex items-center justify-between gap-4">
               <div className="flex-1">
-                <div className="font-semibold text-gray-800">备份文件夹</div>
+                <div className="font-semibold text-gray-800">自动备份间隔</div>
                 <div className="text-sm text-gray-500 mt-1">
-                  {backupConfigured ? (
-                    <>
-                      <span className="text-green-600">✓ 已配置</span>
-                      {lastBackup && (
-                        <span className="ml-2">
-                          最后备份：{lastBackup.toLocaleString('zh-CN')}
-                        </span>
-                      )}
-                    </>
-                  ) : (
-                    '选择本地文件夹用于自动备份'
-                  )}
+                  应用运行时会自动检查并备份
                 </div>
               </div>
-              <div className="flex gap-2">
-                {backupConfigured && (
-                  <button
-                    onClick={handleClearBackupConfig}
-                    className="px-3 py-2 bg-gray-200 text-gray-700 rounded-xl hover:bg-gray-300 transition-all whitespace-nowrap text-sm"
-                  >
-                    清除
-                  </button>
-                )}
-                <button
-                  onClick={handleConfigureBackup}
-                  className="px-4 py-2 bg-gradient-to-r from-orange-600 to-orange-700 text-white rounded-xl hover:from-orange-700 hover:to-orange-800 shadow-md transition-all whitespace-nowrap"
-                >
-                  <FolderOpen size={18} className="inline mr-2" />
-                  {backupConfigured ? '重新选择' : '选择文件夹'}
-                </button>
+              <select
+                value={backupConfig.interval}
+                onChange={(e) => handleBackupIntervalChange(Number(e.target.value) as BackupInterval)}
+                className="px-4 py-2 border-2 border-gray-300 rounded-xl focus:border-orange-500 focus:ring-2 focus:ring-orange-200 transition-all"
+              >
+                <option value={BACKUP_INTERVALS.DAILY}>每天</option>
+                <option value={BACKUP_INTERVALS.THREE_DAYS}>每3天</option>
+                <option value={BACKUP_INTERVALS.WEEKLY}>每周</option>
+                <option value={BACKUP_INTERVALS.DISABLED}>禁用自动备份</option>
+              </select>
+            </div>
+          </div>
+        )}
+
+        {/* 备份状态显示 */}
+        {backupConfig.lastBackupTime && (
+          <div className="p-4 border-b bg-green-50">
+            <div className="flex items-center gap-2">
+              <span className="text-green-600">✓</span>
+              <div className="text-sm text-gray-700">
+                最后备份时间：{backupConfig.lastBackupTime.toLocaleString('zh-CN')}
               </div>
             </div>
           </div>
+        )}
 
-          {/* 自动备份间隔 */}
-          {backupConfigured && (
-            <div className="p-4 border-b">
-              <div className="flex items-center justify-between gap-4">
-                <div className="flex-1">
-                  <div className="font-semibold text-gray-800">自动备份间隔</div>
-                  <div className="text-sm text-gray-500 mt-1">
-                    应用运行时会自动检查并备份
-                  </div>
-                </div>
-                <select
-                  value={autoBackupInterval}
-                  onChange={(e) => handleAutoBackupIntervalChange(Number(e.target.value) as AutoBackupInterval)}
-                  className="px-4 py-2 border-2 border-gray-300 rounded-xl focus:border-orange-500 focus:ring-2 focus:ring-orange-200 transition-all"
-                >
-                  <option value={AUTO_BACKUP_INTERVALS.DAILY}>每天</option>
-                  <option value={AUTO_BACKUP_INTERVALS.THREE_DAYS}>每3天</option>
-                  <option value={AUTO_BACKUP_INTERVALS.WEEKLY}>每周</option>
-                  <option value={AUTO_BACKUP_INTERVALS.DISABLED}>禁用</option>
-                </select>
-              </div>
-            </div>
-          )}
-
-          {/* 立即备份 */}
-          {backupConfigured && (
-            <div className="p-4 border-b">
-              <div className="flex items-center justify-between gap-4">
-                <div className="flex-1">
-                  <div className="font-semibold text-gray-800">立即备份</div>
-                  <div className="text-sm text-gray-500 mt-1">
-                    手动执行一次备份
-                  </div>
-                </div>
-                <button
-                  onClick={handleBackupNow}
-                  disabled={backing}
-                  className="px-4 py-2 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-xl hover:from-blue-700 hover:to-blue-800 shadow-md transition-all whitespace-nowrap disabled:opacity-50"
-                >
-                  <Save size={18} className="inline mr-2" />
-                  {backing ? '备份中...' : '立即备份'}
-                </button>
-              </div>
-            </div>
-          )}
-
-          {/* 从备份恢复 */}
-          <div className="p-4">
+        {/* 立即备份 */}
+        {backupConfig.method !== BackupMethod.DISABLED && (
+          <div className="p-4 border-b">
             <div className="flex items-center justify-between gap-4">
               <div className="flex-1">
-                <div className="font-semibold text-gray-800">从备份恢复</div>
+                <div className="font-semibold text-gray-800">立即备份</div>
                 <div className="text-sm text-gray-500 mt-1">
-                  选择备份文件恢复数据
+                  手动执行一次备份
                 </div>
               </div>
               <button
-                onClick={handleRestore}
-                className="px-4 py-2 bg-gradient-to-r from-purple-600 to-purple-700 text-white rounded-xl hover:from-purple-700 hover:to-purple-800 shadow-md transition-all whitespace-nowrap"
+                onClick={handleBackupNow}
+                disabled={backing}
+                className="px-4 py-2 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-xl hover:from-blue-700 hover:to-blue-800 shadow-md transition-all whitespace-nowrap disabled:opacity-50"
               >
-                <RotateCcw size={18} className="inline mr-2" />
-                恢复数据
+                <Save size={18} className="inline mr-2" />
+                {backing ? '备份中...' : '立即备份'}
               </button>
             </div>
           </div>
-        </div>
-      ) : (
-        <div className="bg-white rounded-2xl shadow-lg overflow-hidden">
-          <div className="px-4 py-3 bg-gradient-to-r from-gray-500 to-gray-600">
-            <h3 className="font-semibold text-white">自动备份</h3>
-          </div>
-          <div className="p-4">
-            <div className="text-center py-6">
-              <div className="text-gray-400 text-4xl mb-3">🚫</div>
-              <div className="font-semibold text-gray-700 mb-2">浏览器不支持</div>
-              <div className="text-sm text-gray-500">
-                自动备份功能需要使用 Chrome、Edge 等支持 File System Access API 的浏览器
-              </div>
-              <div className="text-xs text-gray-400 mt-2">
-                建议使用 Chrome 浏览器以获得完整功能
+        )}
+
+        {/* 从备份恢复 */}
+        <div className="p-4">
+          <div className="flex items-center justify-between gap-4">
+            <div className="flex-1">
+              <div className="font-semibold text-gray-800">从备份恢复</div>
+              <div className="text-sm text-gray-500 mt-1">
+                选择备份文件恢复数据
               </div>
             </div>
+            <button
+              onClick={handleRestore}
+              className="px-4 py-2 bg-gradient-to-r from-purple-600 to-purple-700 text-white rounded-xl hover:from-purple-700 hover:to-purple-800 shadow-md transition-all whitespace-nowrap"
+            >
+              <RotateCcw size={18} className="inline mr-2" />
+              恢复数据
+            </button>
           </div>
         </div>
-      )}
+      </div>
 
       {/* 系统操作 */}
       <div className="bg-white rounded-2xl shadow-lg overflow-hidden">

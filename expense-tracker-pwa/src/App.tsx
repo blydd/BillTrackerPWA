@@ -3,7 +3,7 @@ import { Home, BarChart3, Settings } from 'lucide-react';
 import BillListView from './components/BillListView';
 import StatisticsView from './components/StatisticsView';
 import SettingsView from './components/SettingsView';
-import { startAutoBackupCheck, stopAutoBackupCheck } from './services/fileSystemBackupService';
+import { startAutoBackupCheck, stopAutoBackupCheck } from './services/universalBackupService';
 
 type Tab = 'bills' | 'statistics' | 'settings';
 
