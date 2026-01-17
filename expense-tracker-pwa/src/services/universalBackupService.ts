@@ -1,5 +1,14 @@
 import { db } from './db';
 import { format } from 'date-fns';
+import {
+  initializeGoogleDrive,
+  isGoogleDriveSignedIn,
+  signInToGoogleDrive,
+  uploadBackupToGoogleDrive,
+  downloadBackupFromGoogleDrive,
+  listBackupFiles,
+  isGoogleDriveConfigured
+} from './googleDriveService';
 
 // Google Drive 备份相关接口（预留）
 // interface GoogleDriveConfig {
@@ -40,7 +49,11 @@ export interface BackupConfig {
   method: BackupMethod;
   interval: BackupInterval;
   lastBackupTime?: Date;
-  googleDriveToken?: string;
+  googleDriveConfig?: {
+    apiKey: string;
+    clientId: string;
+    enabled: boolean;
+  };
 }
 
 // 生成备份数据
@@ -154,9 +167,138 @@ export async function restoreFromBackupFile(): Promise<void> {
   });
 }
 
-// Google Drive 备份（预留接口，暂未实现）
-export async function uploadToGoogleDrive(): Promise<void> {
-  throw new Error('Google Drive 备份功能暂未实现，请使用本地下载备份');
+// Google Drive 备份
+export async function uploadToGoogleDrive(): Promise<string> {
+  try {
+    const config = await getBackupConfig();
+    
+    if (!config.googleDriveConfig?.enabled) {
+      throw new Error('Google Drive 备份未启用');
+    }
+
+    if (!isGoogleDriveConfigured(config.googleDriveConfig.apiKey, config.googleDriveConfig.clientId)) {
+      throw new Error('Google Drive API 配置不完整');
+    }
+
+    // 初始化 Google Drive API
+    await initializeGoogleDrive(config.googleDriveConfig.apiKey, config.googleDriveConfig.clientId);
+
+    // 检查登录状态
+    if (!isGoogleDriveSignedIn()) {
+      await signInToGoogleDrive();
+    }
+
+    // 生成备份数据
+    const backupData = await generateBackupData();
+    const fileName = generateBackupFileName();
+
+    // 上传到 Google Drive
+    const fileId = await uploadBackupToGoogleDrive(fileName, backupData);
+    
+    // 更新最后备份时间
+    await updateLastBackupTime();
+    
+    console.log('Google Drive 备份成功:', fileId);
+    return fileId;
+  } catch (error) {
+    console.error('Google Drive 备份失败:', error);
+    throw error;
+  }
+}
+
+// 从 Google Drive 恢复备份
+export async function restoreFromGoogleDrive(): Promise<void> {
+  try {
+    const config = await getBackupConfig();
+    
+    if (!config.googleDriveConfig?.enabled) {
+      throw new Error('Google Drive 备份未启用');
+    }
+
+    if (!isGoogleDriveConfigured(config.googleDriveConfig.apiKey, config.googleDriveConfig.clientId)) {
+      throw new Error('Google Drive API 配置不完整');
+    }
+
+    // 初始化 Google Drive API
+    await initializeGoogleDrive(config.googleDriveConfig.apiKey, config.googleDriveConfig.clientId);
+
+    // 检查登录状态
+    if (!isGoogleDriveSignedIn()) {
+      await signInToGoogleDrive();
+    }
+
+    // 获取备份文件列表
+    const files = await listBackupFiles();
+    
+    if (files.length === 0) {
+      throw new Error('Google Drive 中没有找到备份文件');
+    }
+
+    // 使用最新的备份文件
+    const latestFile = files[0];
+    const backupData = await downloadBackupFromGoogleDrive(latestFile.id!);
+    
+    // 解析备份数据
+    const parsedData = JSON.parse(backupData);
+    
+    // 验证备份数据格式
+    if (!parsedData.version || !parsedData.data) {
+      throw new Error('备份文件格式不正确');
+    }
+
+    // 清空现有数据
+    await db.bills.clear();
+    await db.categories.clear();
+    await db.owners.clear();
+    await db.paymentMethods.clear();
+
+    // 恢复数据
+    if (parsedData.data.categories?.length > 0) {
+      await db.categories.bulkAdd(parsedData.data.categories);
+    }
+    if (parsedData.data.owners?.length > 0) {
+      await db.owners.bulkAdd(parsedData.data.owners);
+    }
+    if (parsedData.data.paymentMethods?.length > 0) {
+      await db.paymentMethods.bulkAdd(parsedData.data.paymentMethods);
+    }
+    if (parsedData.data.bills?.length > 0) {
+      await db.bills.bulkAdd(parsedData.data.bills);
+    }
+
+    console.log('从 Google Drive 恢复数据成功');
+  } catch (error) {
+    console.error('从 Google Drive 恢复数据失败:', error);
+    throw error;
+  }
+}
+
+// 获取 Google Drive 备份文件列表
+export async function getGoogleDriveBackupList(): Promise<gapi.client.drive.File[]> {
+  try {
+    const config = await getBackupConfig();
+    
+    if (!config.googleDriveConfig?.enabled) {
+      throw new Error('Google Drive 备份未启用');
+    }
+
+    if (!isGoogleDriveConfigured(config.googleDriveConfig.apiKey, config.googleDriveConfig.clientId)) {
+      throw new Error('Google Drive API 配置不完整');
+    }
+
+    // 初始化 Google Drive API
+    await initializeGoogleDrive(config.googleDriveConfig.apiKey, config.googleDriveConfig.clientId);
+
+    // 检查登录状态
+    if (!isGoogleDriveSignedIn()) {
+      await signInToGoogleDrive();
+    }
+
+    return await listBackupFiles();
+  } catch (error) {
+    console.error('获取 Google Drive 备份列表失败:', error);
+    throw error;
+  }
 }
 
 // 获取备份配置
@@ -249,9 +391,8 @@ export async function performAutoBackup(): Promise<boolean> {
         return true;
         
       case BackupMethod.GOOGLE_DRIVE:
-        // Google Drive 备份暂未实现
-        console.log('Google Drive 备份功能开发中，请使用本地下载备份');
-        return false;
+        await uploadToGoogleDrive();
+        return true;
         
       default:
         return false;

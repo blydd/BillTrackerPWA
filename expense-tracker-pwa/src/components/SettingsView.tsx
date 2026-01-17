@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Upload, Database, Trash2, ChevronRight, Tag, Users, CreditCard, Download, Save, RotateCcw, Cloud } from 'lucide-react';
+import { Upload, Database, Trash2, ChevronRight, Tag, Users, CreditCard, Download, Save, RotateCcw, Cloud, Settings as SettingsIcon } from 'lucide-react';
 import { initializeData, clearAllData } from '../services/db';
 import { importFromCSV } from '../services/exportService';
 import {
@@ -10,8 +10,15 @@ import {
   getBackupConfig,
   saveBackupConfig,
   downloadBackup,
-  restoreFromBackupFile
+  restoreFromBackupFile,
+  uploadToGoogleDrive,
+  restoreFromGoogleDrive
 } from '../services/universalBackupService';
+import { 
+  isGoogleDriveSignedIn, 
+  getCurrentUser
+} from '../services/googleDriveService';
+import GoogleDriveConfigModal from './GoogleDriveConfigModal';
 import CategoryManagementView from './CategoryManagementView';
 import OwnerManagementView from './OwnerManagementView';
 import PaymentMethodManagementView from './PaymentMethodManagementView';
@@ -26,9 +33,13 @@ export default function SettingsView() {
     interval: BACKUP_INTERVALS.WEEKLY
   });
   const [backing, setBacking] = useState(false);
+  const [showGoogleDriveConfig, setShowGoogleDriveConfig] = useState(false);
+  const [googleDriveSignedIn, setGoogleDriveSignedIn] = useState(false);
+  const [googleDriveUser, setGoogleDriveUser] = useState<gapi.auth2.GoogleUser | null>(null);
 
   useEffect(() => {
     loadBackupConfig();
+    checkGoogleDriveStatus();
   }, []);
 
   async function loadBackupConfig() {
@@ -37,6 +48,16 @@ export default function SettingsView() {
       setBackupConfig(config);
     } catch (error) {
       console.error('加载备份配置失败:', error);
+    }
+  }
+
+  function checkGoogleDriveStatus() {
+    const isSignedIn = isGoogleDriveSignedIn();
+    setGoogleDriveSignedIn(isSignedIn);
+    if (isSignedIn) {
+      setGoogleDriveUser(getCurrentUser());
+    } else {
+      setGoogleDriveUser(null);
     }
   }
 
@@ -67,10 +88,17 @@ export default function SettingsView() {
         await downloadBackup();
         alert('备份成功！文件已下载到您的下载文件夹');
       } else if (backupConfig.method === BackupMethod.GOOGLE_DRIVE) {
-        alert('Google Drive 备份功能开发中，请使用本地下载备份');
+        if (!backupConfig.googleDriveConfig?.enabled) {
+          alert('请先配置 Google Drive');
+          setShowGoogleDriveConfig(true);
+          return;
+        }
+        await uploadToGoogleDrive();
+        alert('备份成功！文件已上传到 Google Drive');
       } else {
         alert('请先选择备份方式');
       }
+      await loadBackupConfig(); // 重新加载配置以更新最后备份时间
     } catch (error) {
       alert('备份失败：' + (error as Error).message);
     } finally {
@@ -84,12 +112,23 @@ export default function SettingsView() {
     }
 
     try {
-      await restoreFromBackupFile();
+      if (backupConfig.method === BackupMethod.GOOGLE_DRIVE && googleDriveSignedIn) {
+        // 从 Google Drive 恢复
+        await restoreFromGoogleDrive();
+      } else {
+        // 从本地文件恢复
+        await restoreFromBackupFile();
+      }
       alert('恢复成功！');
       window.location.reload();
     } catch (error) {
       alert('恢复失败：' + (error as Error).message);
     }
+  };
+
+  const handleGoogleDriveConfigSaved = () => {
+    loadBackupConfig();
+    checkGoogleDriveStatus();
   };
 
   const handleInitialize = async () => {
@@ -289,7 +328,7 @@ export default function SettingsView() {
                 <div className="text-sm text-gray-500">备份文件下载到本地（推荐，兼容所有浏览器）</div>
               </div>
             </label>
-            <label className="flex items-center gap-3 p-3 border-2 rounded-xl cursor-pointer hover:bg-gray-50 transition-all opacity-60">
+            <label className="flex items-center gap-3 p-3 border-2 rounded-xl cursor-pointer hover:bg-gray-50 transition-all">
               <input
                 type="radio"
                 name="backupMethod"
@@ -297,13 +336,31 @@ export default function SettingsView() {
                 checked={backupConfig.method === BackupMethod.GOOGLE_DRIVE}
                 onChange={(e) => handleBackupMethodChange(e.target.value as BackupMethod)}
                 className="text-orange-600"
-                disabled
               />
               <Cloud size={20} className="text-green-600" />
               <div className="flex-1">
                 <div className="font-medium text-gray-800">Google Drive</div>
-                <div className="text-sm text-gray-500">自动上传到 Google Drive（开发中）</div>
+                <div className="text-sm text-gray-500">
+                  自动上传到 Google Drive
+                  {backupConfig.googleDriveConfig?.enabled && googleDriveSignedIn && googleDriveUser && (
+                    <span className="ml-2 text-green-600">
+                      ✓ 已连接 ({googleDriveUser.getBasicProfile().getEmail()})
+                    </span>
+                  )}
+                </div>
               </div>
+              {backupConfig.method === BackupMethod.GOOGLE_DRIVE && (
+                <button
+                  onClick={(e) => {
+                    e.preventDefault();
+                    setShowGoogleDriveConfig(true);
+                  }}
+                  className="px-3 py-1 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 transition-all text-sm"
+                >
+                  <SettingsIcon size={14} className="inline mr-1" />
+                  配置
+                </button>
+              )}
             </label>
             <label className="flex items-center gap-3 p-3 border-2 rounded-xl cursor-pointer hover:bg-gray-50 transition-all">
               <input
@@ -489,6 +546,13 @@ export default function SettingsView() {
           </p>
         </div>
       </div>
+
+      {/* Google Drive 配置模态框 */}
+      <GoogleDriveConfigModal
+        isOpen={showGoogleDriveConfig}
+        onClose={() => setShowGoogleDriveConfig(false)}
+        onConfigSaved={handleGoogleDriveConfigSaved}
+      />
     </div>
   );
 }
