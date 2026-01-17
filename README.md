@@ -4,7 +4,9 @@
 
 ## 在线体验
 
-🌐 访问地址：[即将部署]
+🌐 **访问地址**：https://bill-tracker-pwa.vercel.app/
+
+**推荐使用 Chrome 或 Edge 浏览器以获得完整功能（包括自动备份）**
 
 ## 系统要求
 

@@ -13,7 +13,11 @@ export type AutoBackupInterval = typeof AUTO_BACKUP_INTERVALS[keyof typeof AUTO_
 
 // 检查浏览器是否支持 File System Access API
 export function isFileSystemAccessSupported(): boolean {
-  return 'showDirectoryPicker' in window;
+  try {
+    return typeof window !== 'undefined' && 'showDirectoryPicker' in window;
+  } catch {
+    return false;
+  }
 }
 
 // 请求文件夹访问权限

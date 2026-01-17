@@ -276,7 +276,7 @@ export default function SettingsView() {
       </div>
 
       {/* 自动备份 */}
-      {isFileSystemAccessSupported() && (
+      {isFileSystemAccessSupported() ? (
         <div className="bg-white rounded-2xl shadow-lg overflow-hidden">
           <div className="px-4 py-3 bg-gradient-to-r from-orange-600 to-orange-700">
             <h3 className="font-semibold text-white">自动备份</h3>
@@ -384,6 +384,24 @@ export default function SettingsView() {
                 <RotateCcw size={18} className="inline mr-2" />
                 恢复数据
               </button>
+            </div>
+          </div>
+        </div>
+      ) : (
+        <div className="bg-white rounded-2xl shadow-lg overflow-hidden">
+          <div className="px-4 py-3 bg-gradient-to-r from-gray-500 to-gray-600">
+            <h3 className="font-semibold text-white">自动备份</h3>
+          </div>
+          <div className="p-4">
+            <div className="text-center py-6">
+              <div className="text-gray-400 text-4xl mb-3">🚫</div>
+              <div className="font-semibold text-gray-700 mb-2">浏览器不支持</div>
+              <div className="text-sm text-gray-500">
+                自动备份功能需要使用 Chrome、Edge 等支持 File System Access API 的浏览器
+              </div>
+              <div className="text-xs text-gray-400 mt-2">
+                建议使用 Chrome 浏览器以获得完整功能
+              </div>
             </div>
           </div>
         </div>
